@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 sprs = "0.11.0"
 text_io = "0.1.12"
+
+[profile.release]
+opt-level = 3

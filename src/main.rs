@@ -18,6 +18,12 @@ const NO_PRIO: Prio = Prio {
     src_row: -1,
     src_col: -1,
 };
+const ALREADY_DUMPED: i32 = -5;
+const DUMPED_PRIO: Prio = Prio {
+    src_row: ALREADY_DUMPED,
+    src_col: ALREADY_DUMPED,
+    .. NO_PRIO
+};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -70,6 +76,9 @@ fn main() {
     let mut temp_max_prio_on_prev_it: usize = max_prio_on_prev_it;
 
     while flag_invalidate {
+
+        println!("\n------ ITERATION WITH max_prio = {} ------\n", max_prio_on_prev_it);
+
         flag_invalidate = false;
         base_matrix.iter().enumerate().for_each(|(it, (_, (row, col)))| {
 
@@ -131,11 +140,11 @@ fn main() {
                         // Invalidation has been performed
                         flag_invalidate = true;
 
-                        let (cc_n, cc_i, cc_j) = patterns.get(curr_cell_data.prio).unwrap();
+                        let (cc_n, cc_i, cc_j) = *patterns.get(curr_cell_data.prio).unwrap();
                         println!("Performing invalidation of pattern {:?} starting at {:?}", (cc_n, cc_i, cc_j), (curr_cell_data.src_row, curr_cell_data.src_col));
-                        for jj in 0..*cc_n {
-                            let cc_curr_row = ((curr_cell_data.src_row as i32) + (jj* (*cc_i))) as usize;
-                            let cc_curr_col = ((curr_cell_data.src_col as i32) + (jj* (*cc_j))) as usize;
+                        for jj in 0..cc_n {
+                            let cc_curr_row = ((curr_cell_data.src_row as i32) + (jj* (cc_i))) as usize;
+                            let cc_curr_col = ((curr_cell_data.src_col as i32) + (jj* (cc_j))) as usize;
 
                             let cc_abs_row = cc_curr_row + cc_curr_col/numcols;
                             let cc_abs_col = cc_curr_col % numcols;
@@ -180,8 +189,6 @@ fn main() {
             }
         });
 
-        println!("\n------ NEW ITERATION ------\n");
-
         max_prio_on_prev_it = temp_max_prio_on_prev_it;
     }
 
@@ -189,14 +196,55 @@ fn main() {
     base_matrix.iter().enumerate().for_each(|(it, (_, (row, col)))| {
         println!("Iteration {:?} = {:?}. Value is [{:?}] [pattern = {:?}]", it, (row,col), explored_matrix.data()[it], {
             if explored_matrix.data()[it].prio < patterns.len() {
-                let (i,j,k) = patterns.get(explored_matrix.data()[it].prio).unwrap();
-                (*i, *j, *k)
+                let (i,j,k) = *patterns.get(explored_matrix.data()[it].prio).unwrap();
+                (i, j, k)
             } else {
                 (-1, -1, -1)
             }
         });
     });
 
+    println!("\n\n\n-------------------------------------------\n\n");
+    println!("Row\tCol\tN\tI\tJ");
+
     // Traverse matrix reading patterns (on nonzero hit add to pattern table and invalidate pattern until empty)
-    // TODO
+    base_matrix.iter().enumerate().for_each(|(it, (_, (row, col)))| {
+
+        let curr_cell_data = explored_matrix.data()[it];
+
+        // It it has already been dumped
+        if curr_cell_data.src_col == ALREADY_DUMPED || curr_cell_data.src_row == ALREADY_DUMPED {
+            return;
+        }
+        
+        // If does not belong to any piece we have to treat it differently
+        if curr_cell_data.prio == NO_PRIO.prio {
+            println!("{}\t{}\t{}\t{}\t{}", row, col, 1, 0, 0);
+            return;
+        } else {
+            let (n,i,j) = *patterns.get(curr_cell_data.prio).unwrap(); 
+            println!("{}\t{}\t{}\t{}\t{}", row, col, n, i, j);
+        }
+
+        // Mark rest of the cells in the pattern as dumped
+        let (cc_n, cc_i, cc_j) = *patterns.get(curr_cell_data.prio).unwrap();
+        for jj in 0..cc_n {
+            let cc_curr_row = ((curr_cell_data.src_row as i32) + (jj* (cc_i))) as usize;
+            let cc_curr_col = ((curr_cell_data.src_col as i32) + (jj* (cc_j))) as usize;
+
+            let cc_abs_row = cc_curr_row + cc_curr_col/numcols;
+            let cc_abs_col = cc_curr_col % numcols;
+
+            let cc_location = explored_matrix.find_locations(
+                cc_abs_row,
+                cc_abs_col
+            );
+
+            explored_matrix.set_triplet(cc_location[0], 
+                cc_abs_row,
+                cc_abs_col,
+                DUMPED_PRIO
+            );
+        }
+    });
 }
