@@ -80,10 +80,12 @@ fn main() {
         println!("\n------ ITERATION WITH max_prio = {} ------\n", max_prio_on_prev_it);
 
         flag_invalidate = false;
-        base_matrix.iter().enumerate().for_each(|(it, (_, (row, col)))| {
+        base_matrix.iter().enumerate().for_each(|(_it, (_, (row, col)))| {
 
+            #[cfg(feature = "shortcut_on_invalidation")] 
             // When invalidation has occurred, only check data that has not been assigned to a pattern
-            if explored_matrix.data()[it].prio <= max_prio_on_prev_it {
+            // This leads to improved performance while producing slightly different (although correct) results 
+            if explored_matrix.data()[_it].prio <= max_prio_on_prev_it {
                 // println!("Second try abort on [{},{}]!. max_prio was {:?} and cell had {:?}", row, col, max_prio_on_prev_it, explored_matrix.data()[it].prio);
                 return;
             } else {
@@ -93,6 +95,13 @@ fn main() {
             // TODO -- Maybe in the future change this enumerate for a proper heuristic of priority
             // TODO -- improve search by discarding patterns under max_prio_on_prev_it
             'outer: for (priority, (n, i, j)) in patterns.iter().enumerate() {
+
+                #[cfg(feature = "shortcut_on_pattern_search")]
+                // This leads to improved performance while producing slightly different (although correct) results 
+                if priority < max_prio_on_prev_it {
+                    continue 'outer;
+                }
+
                 for ii in 0..*n {
                     let curr_row = ((row as i32) + (ii* (*i))) as usize;
                     let curr_col = ((col as i32) + (ii* (*j))) as usize;

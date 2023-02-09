@@ -11,3 +11,7 @@ text_io = "0.1.12"
 
 [profile.release]
 opt-level = 3
+
+[features]
+shortcut_on_invalidation = []
+shortcut_on_pattern_search = []

@@ -28,8 +28,14 @@ Optionally, to compile to the C equivalent of `-march=native` compilation must b
 RUSTFLAGS="-C target-cpu=native" cargo build --release
 ```
 
+### Enabling features
+This prototype implements two shortcuts that, depending on the characteristics of the matrix, may reduce search time drastically while producing identical or very similar results. The features are listed on the `Cargo.toml` file and can be activated at compile time as shown below
+```bash
+cargo build <other_flags> --features shortcut_on_invalidation,shortcut_on_pattern_search
+```
+
 ## Usage
-Debug and release builds are located inside the `target` folder, like below. Needless to say, release builds must be used if good speed is desired, as in this case tend to perform around 20 times faster.
+Debug and release builds are located inside the `target` folder, like below. Needless to say, release builds must be used if good speed is desired, as in this case tend to perform around 20 to 100 times faster.
 ```bash
 # Debug build can be executed with
 ./target/debug/matrix_rs <flags>
