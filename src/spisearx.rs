@@ -25,7 +25,7 @@ const DUMPED_PRIO: Prio = Prio {
 };
 
 /* FUNCTIONS */
-pub struct BaseMatrix {
+pub struct SpISearxMatrix {
     value_matrix: CsMat<f64>,
     exploration_matrix: TriMat<Prio>,
     nonzeros: usize,
@@ -35,7 +35,7 @@ pub struct BaseMatrix {
 }
 
 bitflags! {
-    pub struct SearchPatternsFlags: u64 {
+    pub struct SpISearxPatternsFlags: u64 {
         const NoFlags               = 0b0000_0000;
         const SkipOnInvalidation    = 0b0000_0001;
         const SkipOnPatternSearch   = 0b0000_0010;
@@ -43,8 +43,8 @@ bitflags! {
     }
 }
 
-impl BaseMatrix {
-    pub fn from(path: &str) -> BaseMatrix {
+impl SpISearxMatrix {
+    pub fn from_file(path: &str) -> SpISearxMatrix {
         let value_matrix = sprs::io::read_matrix_market(path).unwrap().to_csr();
         let (numrows, numcols) = (value_matrix.rows(), value_matrix.cols());
         let nonzeros = value_matrix.nnz();
@@ -54,7 +54,7 @@ impl BaseMatrix {
             exploration_matrix.add_triplet(row, col, NO_PRIO);
         });
 
-        return BaseMatrix {
+        return SpISearxMatrix {
             value_matrix: value_matrix,
             exploration_matrix: exploration_matrix,
             nonzeros: nonzeros,
@@ -89,11 +89,11 @@ impl BaseMatrix {
         });
     }
 
-    pub fn search_patterns(&mut self, flags: SearchPatternsFlags) {
+    pub fn search_patterns(&mut self, flags: SpISearxPatternsFlags) {
 
-        let skip_on_invalidation = flags.contains(SearchPatternsFlags::SkipOnInvalidation);
-        let skip_on_pattern_search = flags.contains(SearchPatternsFlags::SkipOnPatternSearch);
-        let print_information = flags.contains(SearchPatternsFlags::PrintInformation);
+        let skip_on_invalidation = flags.contains(SpISearxPatternsFlags::SkipOnInvalidation);
+        let skip_on_pattern_search = flags.contains(SpISearxPatternsFlags::SkipOnPatternSearch);
+        let print_information = flags.contains(SpISearxPatternsFlags::PrintInformation);
         
         let mut flag_invalidate = true;
         let mut max_prio_on_prev_it: usize = 0;
