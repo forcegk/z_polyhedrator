@@ -3,7 +3,6 @@ use std::{io::BufRead};
 use sprs::{CsMat};
 use bitflags::bitflags;
 
-
 type Pattern = (i32, i32, i32);
 type Piece = (usize, usize, Pattern);
 
@@ -73,7 +72,29 @@ impl SpGSearxMatrix {
         // Parse possible flags
         // let skip_on_invalidation = flags.contains(SpGSearxPatternsFlags::SkipOnInvalidation);
         
-        
+        // First pass looking for patterns
+        self.value_matrix.iter().enumerate().for_each(|(_it, (_, (row, col)))| {
+            // let value = self.value_matrix.get(row, col);
+            // self.patterns.iter().for_each(|pattern|{
+            let mut found: bool = false;
+            let mut piece: Piece = (0,0,(0,0,0));
+            for pattern in self.patterns.iter(){
+                let result = check_pattern(&self.value_matrix, (row,col), pattern);
+                match result {
+                    None => continue,
+                    Some(found_piece) => {
+                        found = true;
+                        piece = found_piece;
+                        break;
+                    },
+                }
+            }
+
+            if found {
+                // set places to found and add piece
+            }
+
+        });
     }
 
     pub fn print_pieces(&self) {
@@ -84,4 +105,26 @@ impl SpGSearxMatrix {
         });
     }
 
+}
+
+#[inline(always)]
+fn check_pattern(csmat: &CsMat<f64>, curr_pos: (usize, usize), pattern: &Pattern) -> Option<Piece> {
+    // println!("Checking pattern {:?}", pattern);
+    let &(n,i,j) = pattern;
+    let (x,y) = curr_pos;
+
+    // Discard out-of-bounds patterns
+    if (x as i64 + n as i64 * i as i64) >= csmat.rows() as i64 || (y as i64 + n as i64 * j as i64) >= csmat.cols() as i64 {
+        return None;
+    }
+
+    for ii in 0..n {
+        let position = csmat.get(x as usize + (i as i64 * ii as i64) as usize, y as usize + (j as i64 * ii as i64) as usize);
+        match position {
+            Some(_) => continue,
+            None    => return None,
+        }
+    }
+
+    return Some((x,y,(n,i,j)));
 }
