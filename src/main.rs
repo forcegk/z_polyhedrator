@@ -32,11 +32,12 @@ fn main() {
     // base_matrix.search_patterns(spisearx::SpISearxPatternsFlags::NoFlags
     //     | spisearx::SpISearxPatternsFlags::SkipOnInvalidation
     //     | spisearx::SpISearxPatternsFlags::SkipOnPatternSearch
-    //     | spisearx::SpISearxPatternsFlags::PrintInformation
+    //     // | spisearx::SpISearxPatternsFlags::PrintInformation
     // );
 
     base_matrix.search_patterns(spgsearx::SpGSearxPatternsFlags::NoFlags);
 
     println!("\n\n---------------------------------------------------------\n");
     base_matrix.print_pieces();
+    // println!("DONE");
 }

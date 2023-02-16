@@ -143,6 +143,7 @@ impl SpGSearxMatrix {
 }
 
 #[inline(always)]
+#[allow(dead_code)]
 fn check_pattern(csmat: &CsMat<bool>, curr_pos: (usize, usize), pattern: &Pattern) -> Option<Piece> {
     // println!("Checking pattern {:?}", pattern);
     let &(n,i,j) = pattern;
@@ -150,8 +151,8 @@ fn check_pattern(csmat: &CsMat<bool>, curr_pos: (usize, usize), pattern: &Patter
 
     // println!("{:?}", (x,y,n,i,j));
 
-    let max_pos_x = (x as i64 + n as i64 * i as i64);
-    let max_pos_y = (y as i64 + n as i64 * j as i64);
+    let max_pos_x = x as i64 + n as i64 * i as i64;
+    let max_pos_y = y as i64 + n as i64 * j as i64;
 
     // Discard out-of-bounds patterns
     if *csmat.get(x,y).unwrap() || max_pos_x < 0 || max_pos_x >= csmat.rows() as i64 || max_pos_y < 0 || max_pos_y >= csmat.cols() as i64 {
