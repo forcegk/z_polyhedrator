@@ -42,16 +42,14 @@ impl SPFGen {
 #[inline(always)]
 #[allow(dead_code)]
 fn ast_to_uwc(ast: Piece) -> Uwc {
-    let (row, col, (n, i, j)) = ast;
+    let (_, _, (n, i, j)) = ast;
 
-    // OLLIÑO! This can be negative if i < 0
-    // let row_range: i32 = (row as i32 + n*i) - row as i32;
     let it_range = n-1;
 
     // TODO fix here for n-dimensional (currently 1D only)
     let u = vec![ vec![-1], vec![1] ];
     let w = vec![ it_range, 0 ];
-    let c = vec![ j, i ];
+    let c = vec![ i, j ];
 
     return (u, w, c);
 }
