@@ -10,10 +10,11 @@ pub struct SPFGen {
 impl SPFGen {
     pub fn from_piece_list(ast_list: Vec<Piece>) -> SPFGen {
 
-        let mut uwc_list: Vec<Uwc>;
+        let mut uwc_list: Vec<Uwc> = ast_list.iter().map(|ast| ast_to_uwc(*ast)).collect();
 
         return SPFGen {
             ast_list,
+            uwc_list
         };
     }
 
@@ -24,37 +25,33 @@ impl SPFGen {
         });   
     }
 
+    pub fn print_uwc_list(&self) {
+        println!("Uwc_List:\nU\t\tw\tc");
+        self.uwc_list.iter().for_each(|(U,w,c)| {
+            println!("{:?}\t{:?}\t{:?}", U, w, c);
+        });   
+    }
+
+
     // pub fn print_uwc_list(&self) {
 
     // }
 }
 
+// TODO fix this for n-dimensional (currently 1D only)
 #[inline(always)]
 #[allow(dead_code)]
-fn ast_to_uwc(ast: Piece) {
+fn ast_to_uwc(ast: Piece) -> Uwc {
     let (row, col, (n, i, j)) = ast;
 
     // OLLIÑO! This can be negative if i < 0
     // let row_range: i32 = (row as i32 + n*i) - row as i32;
-    let row_range = n-1;
+    let it_range = n-1;
 
-    // 1st i >= 0    --   2nd -i + row_range >= 0
-    // 1st -i >= 0   --   2nd -i - row_range >= 0 
+    // TODO fix here for n-dimensional (currently 1D only)
+    let u = vec![ vec![-1], vec![1] ];
+    let w = vec![ it_range, 0 ];
+    let c = vec![ j, i ];
 
-    let mut uwc: Uwc = ()
-
-    let mut uwc: Uwc = (vec![vec![0; n as usize]; n as usize], vec![0; n as usize], vec![0; n as usize]);
-    let mut uwc_row: Vec<i32> = vec![0; n as usize];
-    let mut uwc_col: Vec<i32> = vec![0; n as usize];
-    let mut uwc_val: Vec<i32> = vec![0; n as usize];
-
-    uwc_row[i as usize] = 1;
-    uwc_col[j as usize] = 1;
-    uwc_val[n as usize] = 1;
-
-    uwc.0[i as usize][j as usize] = 1;
-    uwc.1[i as usize] = 1;
-    uwc.2[j as usize] = 1;
-
-    // return uwc;
+    return (u, w, c);
 }
