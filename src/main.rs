@@ -9,6 +9,10 @@ use spisearx::{SpISearxMatrix,SpISearxPatternsFlags};
 mod spgsearx;
 use spgsearx::{SpGSearxMatrix,SpGSearxPatternsFlags};
 
+use crate::spfgen::SPFGen;
+
+mod spfgen;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -38,6 +42,11 @@ fn main() {
     base_matrix.search_patterns(spgsearx::SpGSearxPatternsFlags::NoFlags);
 
     println!("\n\n---------------------------------------------------------\n");
-    base_matrix.print_pieces();
+    // base_matrix.print_pieces();
     // println!("DONE");
+
+    let spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list());
+
+    spfgen.print_ast_list();
+
 }

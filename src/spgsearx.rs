@@ -140,6 +140,10 @@ impl SpGSearxMatrix {
         });
     }
 
+    pub fn get_piece_list(&self) -> Vec<Piece> {
+        return self.found_pieces.clone();
+    }
+
 }
 
 #[inline(always)]

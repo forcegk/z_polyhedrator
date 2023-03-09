@@ -4,7 +4,8 @@ use text_io::scan;
 use bitflags::bitflags;
 
 /* DATATYPES */
-type Piece = (i32, i32, i32);
+type Pattern = (i32, i32, i32);
+type Piece = (usize, usize, Pattern);
 
 #[derive(Clone, Copy, Debug)]
 struct Prio {
@@ -31,7 +32,7 @@ pub struct SpISearxMatrix {
     nonzeros: usize,
     numrows: usize,
     numcols: usize,
-    patterns: Vec<Piece>,
+    patterns: Vec<Pattern>,
 }
 
 bitflags! {
@@ -73,7 +74,7 @@ impl SpISearxMatrix {
         self.patterns = lines
             .iter()
             .map(|x| {
-                let (i,j,k): Piece;
+                let (i,j,k): Pattern;
                 scan!(x.bytes() => "({},{},{})", i, j, k);
     
                 (i, j, k)
@@ -229,13 +230,23 @@ impl SpISearxMatrix {
         }
     }
 
-    pub fn print_pieces(&mut self) {
-        println!("Row\tCol\tN\tI\tJ");
-    
-        // Traverse matrix reading patterns (on nonzero hit add to pattern table and invalidate pattern until empty)
+
+    pub fn get_piece_list(&mut self) -> Vec<Piece> {
+        let mut piece_list: Vec<Piece> = vec![];
+
+        // Copy this to allow multiple get_piece // print_piece list calls
+        let mut local_exploration_matrix = TriMat::new((self.numrows, self.numcols));
+        local_exploration_matrix.reserve_exact(self.nonzeros);
+
+        // This into_iter() should consume the resource but it does not ????
+        // whatever let's use it for now...
+        self.exploration_matrix.into_iter().for_each(|(data, (row, col))| {
+            local_exploration_matrix.add_triplet(row, col, data)
+        });
+
         self.value_matrix.iter().enumerate().for_each(|(it, (_, (row, col)))| {
     
-            let curr_cell_data = self.exploration_matrix.data()[it];
+            let curr_cell_data = local_exploration_matrix.data()[it];
     
             // It it has already been dumped
             if curr_cell_data.src_col == ALREADY_DUMPED || curr_cell_data.src_row == ALREADY_DUMPED {
@@ -244,11 +255,13 @@ impl SpISearxMatrix {
             
             // If does not belong to any piece we have to treat it differently
             if curr_cell_data.prio == NO_PRIO.prio {
-                println!("{}\t{}\t{}\t{}\t{}", row, col, 1, 0, 0);
+                // println!("{}\t{}\t{}\t{}\t{}", row, col, 1, 0, 0);
+                piece_list.push((row, col, (1, 0, 0)));
                 return;
             } else {
                 let &(n,i,j) = self.patterns.get(curr_cell_data.prio).unwrap(); 
-                println!("{}\t{}\t{}\t{}\t{}", row, col, n, i, j);
+                // println!("{}\t{}\t{}\t{}\t{}", row, col, n, i, j);
+                piece_list.push((row, col, (n, i, j)));
             }
     
             // Mark rest of the cells in the pattern as dumped
@@ -260,18 +273,30 @@ impl SpISearxMatrix {
                 let cc_abs_row = cc_curr_row + cc_curr_col/self.numcols;
                 let cc_abs_col = cc_curr_col % self.numcols;
     
-                let cc_location = self.exploration_matrix.find_locations(
+                let cc_location = local_exploration_matrix.find_locations(
                     cc_abs_row,
                     cc_abs_col
                 );
     
-                self.exploration_matrix.set_triplet(cc_location[0], 
+                local_exploration_matrix.set_triplet(cc_location[0], 
                     cc_abs_row,
                     cc_abs_col,
-                    DUMPED_PRIO
+                    &DUMPED_PRIO
                 );
             }
         });
+
+        return piece_list;
+    }
+
+    pub fn print_pieces(&mut self) {
+        println!("Row\tCol\tN\tI\tJ");
+
+        let piece_list: Vec<Piece> = self.get_piece_list();
+
+        piece_list.iter().for_each(|(row, col, (n, i, j))| {
+            println!("{}\t{}\t{}\t{}\t{}", row, col, n, i, j);
+        });      
     }
 }
 
