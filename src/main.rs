@@ -49,6 +49,6 @@ fn main() {
 
     spfgen.print_ast_list();
 
-    spfgen.print_uwc_list();
+    spfgen.print_uwc_list(true);
 
 }
