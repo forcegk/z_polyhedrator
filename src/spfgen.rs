@@ -1,4 +1,6 @@
-use std::fmt::format;
+use std::{fmt::format, fs::{File, self}, path::PathBuf, io::{BufWriter, Write}};
+
+use byteorder::{WriteBytesExt, LittleEndian};
 
 type Pattern = (i32, i32, i32);
 type Piece = (usize, usize, Pattern);
@@ -6,15 +8,28 @@ type Uwc = (Vec<Vec<i32>>, Vec<i32>, Vec<i32>);
 
 pub struct SPFGen {
     ast_list: Vec<Piece>,
-    uwc_list: Vec<Uwc>
+    uwc_list: Vec<Uwc>,
+    pub nrows: usize,
+    pub ncols: usize,
+    pub nnz: usize,
+    pub inc_nnz: usize
 }
 
 impl SPFGen {
-    pub fn from_piece_list(ast_list: Vec<Piece>) -> Self {
+    pub fn from_piece_list(ast_list: Vec<Piece>, nrows: usize, ncols: usize, nnz: usize) -> Self {
         let uwc_list: Vec<Uwc> = ast_list.iter().map(|ast| ast_to_uwc(*ast)).collect();
+        let ninc_nnz = ast_list.iter().filter(|(_,_,(n,_,_))| *n == 1).count();
+        let inc_nnz = nnz - ninc_nnz;
+
+        // println!("nrows = {}, ncols = {}, nnz = {}, inc_nnz = {}", nrows, ncols, nnz, inc_nnz);
+
         return SPFGen {
             ast_list,
-            uwc_list
+            uwc_list,
+            nrows,
+            ncols,
+            nnz,
+            inc_nnz
         };
     }
 
@@ -64,6 +79,24 @@ impl SPFGen {
                 } else { "\n".to_string() }
             });
         });
+    }
+
+    pub fn write_spf(&self, file_path: &str) {
+        let mut file = File::create(file_path).expect(format!("Unable to create file {}", file_path).as_str());
+
+        let path = PathBuf::from(file_path);
+        print!("Writing to file {}", fs::canonicalize(&path).unwrap().display());
+
+        // Write header
+        file.write_i32::<LittleEndian>(self.nnz as i32).unwrap();
+        file.write_i32::<LittleEndian>(self.inc_nnz as i32).unwrap();
+        file.write_i32::<LittleEndian>(self.nrows as i32).unwrap();
+        file.write_i32::<LittleEndian>(self.ncols as i32).unwrap();
+
+        // Write dimensions
+        file.write_i16::<LittleEndian>(2i16).unwrap();
+        // number of base shapes is actual found shapes, not unfound ones
+
     }
 }
 

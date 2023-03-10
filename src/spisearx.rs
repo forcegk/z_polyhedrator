@@ -29,9 +29,9 @@ const DUMPED_PRIO: Prio = Prio {
 pub struct SpISearxMatrix {
     value_matrix: CsMat<f64>,
     exploration_matrix: TriMat<Prio>,
-    nonzeros: usize,
-    numrows: usize,
-    numcols: usize,
+    pub nonzeros: usize,
+    pub numrows: usize,
+    pub numcols: usize,
     patterns: Vec<Pattern>,
 }
 

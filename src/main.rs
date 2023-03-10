@@ -45,10 +45,12 @@ fn main() {
     // base_matrix.print_pieces();
     // println!("DONE");
 
-    let spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list());
+    let spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list(), base_matrix.numrows, base_matrix.numcols, base_matrix.nonzeros);
 
     spfgen.print_ast_list();
 
     spfgen.print_uwc_list(true);
+
+    spfgen.write_spf("output.spf")
 
 }

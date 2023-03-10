@@ -12,9 +12,9 @@ const NO_PRIO: Prio = std::usize::MAX;
 pub struct SpGSearxMatrix {
     value_matrix: CsMat<bool>,
     // exploration_matrix: Vec<Prio>,
-    nonzeros: usize,
-    numrows: usize,
-    numcols: usize,
+    pub nonzeros: usize,
+    pub numrows: usize,
+    pub numcols: usize,
     patterns: Vec<Pattern>,
     found_pieces: Vec<Piece>,
 }

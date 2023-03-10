@@ -9,6 +9,7 @@ edition = "2021"
 sprs = "0.11.0"
 text_io = "0.1.12"
 bitflags = "1.3.2"
+byteorder = "1.4.3"
 
 [profile.release]
 opt-level = 3
