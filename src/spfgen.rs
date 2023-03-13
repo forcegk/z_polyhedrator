@@ -1,4 +1,4 @@
-use std::{fmt::format, fs::{File, self}, path::PathBuf, io::{BufWriter, Write}};
+use std::{fs::{File, self}, path::PathBuf, collections::{HashMap, HashSet}};
 
 use byteorder::{WriteBytesExt, LittleEndian};
 
@@ -12,7 +12,8 @@ pub struct SPFGen {
     pub nrows: usize,
     pub ncols: usize,
     pub nnz: usize,
-    pub inc_nnz: usize
+    pub inc_nnz: usize,
+    distinct_patterns: HashMap<Pattern, usize>
 }
 
 impl SPFGen {
@@ -20,8 +21,15 @@ impl SPFGen {
         let uwc_list: Vec<Uwc> = ast_list.iter().map(|ast| ast_to_uwc(*ast)).collect();
         let ninc_nnz = ast_list.iter().filter(|(_,_,(n,_,_))| *n == 1).count();
         let inc_nnz = nnz - ninc_nnz;
+        let mut distinct_patterns: HashMap<Pattern, usize> = HashMap::new();
+
+        // Create distinct pattern HashMap indexed 0..used_patterns with the help of an intermediate HashSet
+        ast_list.iter().map(|(_,_,pattern)| *pattern).collect::<HashSet<Pattern>>().into_iter().enumerate().for_each(|(idx, pattern)| {
+            distinct_patterns.insert(pattern, idx);
+        });
 
         // println!("nrows = {}, ncols = {}, nnz = {}, inc_nnz = {}", nrows, ncols, nnz, inc_nnz);
+        // println!("\n{:?}", distinct_patterns);
 
         return SPFGen {
             ast_list,
@@ -29,7 +37,8 @@ impl SPFGen {
             nrows,
             ncols,
             nnz,
-            inc_nnz
+            inc_nnz,
+            distinct_patterns
         };
     }
 
@@ -96,6 +105,7 @@ impl SPFGen {
         // Write dimensions
         file.write_i16::<LittleEndian>(2i16).unwrap();
         // number of base shapes is actual found shapes, not unfound ones
+        file.write_i32::<LittleEndian>(self.distinct_patterns.len() as i32).unwrap();
 
     }
 }
