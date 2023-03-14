@@ -1,4 +1,4 @@
-use std::{fs::{File, self}, path::PathBuf, collections::{HashMap, HashSet}};
+use std::{fs::{File, self}, path::PathBuf, collections::{HashSet,HashMap}};
 
 use byteorder::{WriteBytesExt, LittleEndian};
 
@@ -8,7 +8,7 @@ type Uwc = (Vec<Vec<i32>>, Vec<i32>, Vec<i32>);
 
 pub struct SPFGen {
     ast_list: Vec<Piece>,
-    uwc_list: Vec<Uwc>,
+    uwc_list: Vec<(usize, Uwc)>,
     pub nrows: usize,
     pub ncols: usize,
     pub nnz: usize,
@@ -18,15 +18,17 @@ pub struct SPFGen {
 
 impl SPFGen {
     pub fn from_piece_list(ast_list: Vec<Piece>, nrows: usize, ncols: usize, nnz: usize) -> Self {
-        let uwc_list: Vec<Uwc> = ast_list.iter().map(|ast| ast_to_uwc(*ast)).collect();
         let ninc_nnz = ast_list.iter().filter(|(_,_,(n,_,_))| *n == 1).count();
         let inc_nnz = nnz - ninc_nnz;
         let mut distinct_patterns: HashMap<Pattern, usize> = HashMap::new();
 
         // Create distinct pattern HashMap indexed 0..used_patterns with the help of an intermediate HashSet
-        ast_list.iter().map(|(_,_,pattern)| *pattern).collect::<HashSet<Pattern>>().into_iter().enumerate().for_each(|(idx, pattern)| {
+        ast_list.iter().map(|&(_,_,pattern)| pattern).collect::<HashSet<Pattern>>().into_iter().enumerate().for_each(|(idx, pattern)| {
             distinct_patterns.insert(pattern, idx);
         });
+        // let distinct_patterns: Vec<Pattern> = ast_list.iter().map(|(_,_,pattern)| *pattern).collect::<HashSet<Pattern>>().into_iter().collect();
+
+        let uwc_list: Vec<(usize, Uwc)> = ast_list.iter().map(|(row,col,pattern)| (*distinct_patterns.get(pattern).unwrap(), ast_to_uwc((*row,*col,*pattern)))).collect();
 
         // println!("nrows = {}, ncols = {}, nnz = {}, inc_nnz = {}", nrows, ncols, nnz, inc_nnz);
         // println!("\n{:?}", distinct_patterns);
@@ -50,27 +52,26 @@ impl SPFGen {
     }
 
     pub fn print_uwc_list(&self, show_eqs: bool) {
-        println!("Uwc_List:\nU\t\tw\tc");
-        self.uwc_list.iter().for_each(|(U,w,c)| {
-            print!("{:?}\t{:?}\t{:?}{}", U, w, c, {
+        println!("Uwc_List:\nid\tU\t\tw\tc");
+        self.uwc_list.iter().for_each(|(id,(u,w,c))| {
+            print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, {
                 if show_eqs {
                     let mut str_list: Vec<String> = vec![];
 
                     let idx_values = vec!["i", "j", "k", "l"];
 
-                    // str_list.push("   ".to_string());
-                    for i in 0..U.len() {
+                    for i in 0..u.len() {
                         str_list.push("   ===   ".to_string());
-                        for j in 0..U[i].len(){
+                        for j in 0..u[i].len(){
                             str_list.push(format!("{sign}{variable} {weight} >= 0", sign={
-                                match U[i][j] {
+                                match u[i][j] {
                                     1 => "+".to_string(),
                                     -1 => "-".to_string(),
                                     0 => "".to_string(),
-                                    _ => U[i][j].to_string()
+                                    _ => u[i][j].to_string()
                                 }
                             }, variable={
-                                match U[i][j] {
+                                match u[i][j] {
                                     0 => "",
                                     _ => idx_values[j]
                                 }
@@ -106,6 +107,21 @@ impl SPFGen {
         file.write_i16::<LittleEndian>(2i16).unwrap();
         // number of base shapes is actual found shapes, not unfound ones
         file.write_i32::<LittleEndian>(self.distinct_patterns.len() as i32).unwrap();
+        // write zero hierarchical shapes
+        file.write_i32::<LittleEndian>(0i32).unwrap();
+        // write TEMPORARY ZERO as pointer to start of data. Will need to fseek to position 26 later
+        //  (python code `f.seek ( 26 )` on write_spf func at around line 810)
+        file.write_i32::<LittleEndian>(0i32).unwrap();
+
+        // Write maximum dimensionality of iP for vertex_rec (currently FIXME only supports 1d)
+        file.write_i16::<LittleEndian>(0i16).unwrap();
+
+        // FIXME Get shape_dims_max from previous it
+        for _ in 0..1 {
+            file.write_i32::<LittleEndian>(0i32).unwrap();
+        }
+
+
 
     }
 }
