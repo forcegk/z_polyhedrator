@@ -53,6 +53,8 @@ fn main() {
 
     spfgen.print_uwc_list(true);
 
+    spfgen.print_distinct_uwc_list(true);
+
     spfgen.write_spf("output.spf")
 
 }

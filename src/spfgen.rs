@@ -1,6 +1,7 @@
 use std::{fs::{File, self}, path::PathBuf, collections::{HashSet,HashMap}};
 
 use byteorder::{WriteBytesExt, LittleEndian};
+use linked_hash_map::LinkedHashMap;
 
 type Pattern = (i32, i32, i32);
 type Piece = (usize, usize, Pattern);
@@ -13,26 +14,41 @@ pub struct SPFGen {
     pub ncols: usize,
     pub nnz: usize,
     pub inc_nnz: usize,
-    distinct_patterns: HashMap<Pattern, usize>
+    distinct_patterns: LinkedHashMap<Pattern, usize>,
+    distinct_uwc: LinkedHashMap<Uwc, usize>
 }
 
 impl SPFGen {
     pub fn from_piece_list(ast_list: Vec<Piece>, nrows: usize, ncols: usize, nnz: usize) -> Self {
         let ninc_nnz = ast_list.iter().filter(|(_,_,(n,_,_))| *n == 1).count();
         let inc_nnz = nnz - ninc_nnz;
-        let mut distinct_patterns: HashMap<Pattern, usize> = HashMap::new();
 
-        // Create distinct pattern HashMap indexed 0..used_patterns with the help of an intermediate HashSet
-        ast_list.iter().map(|(_,_,pattern)| *pattern).filter(|(i,_,_)| *i > 1).collect::<HashSet<Pattern>>().into_iter().enumerate().for_each(|(idx, pattern)| {
-            distinct_patterns.insert(pattern, idx);
-        });
+        // Create distinct pattern LinkedHashMap indexed 0..used_patterns with the help of an intermediate HashSet
+        let mut distinct_patterns: LinkedHashMap<Pattern, usize> = ast_list
+            .iter()
+            .map(|(_,_,pattern)| *pattern)
+            .filter(|(i,_,_)| *i > 1)
+            .collect::<HashSet<Pattern>>()
+            .into_iter()
+            .enumerate()
+            .map(|(idx, pattern)| (pattern, idx))
+            .collect();
         // Finally insert (1,0,0) pattern. (Has to be the last one):
         distinct_patterns.insert((1,0,0), distinct_patterns.len());
 
-        let uwc_list: Vec<(usize, Uwc)> = ast_list.iter().map(|(row,col,pattern)| (*distinct_patterns.get(pattern).unwrap(), ast_to_uwc((*row,*col,*pattern)))).collect();
+        let uwc_list: Vec<(usize, Uwc)> = ast_list
+            .iter()
+            .map(|(_,_,pattern)| (*distinct_patterns.get(pattern).unwrap(), pattern_to_uwc(pattern)))
+            .collect();
+
+        let distinct_uwc: LinkedHashMap<Uwc, usize> = distinct_patterns
+            .iter()
+            .map(|(pattern, id)| (pattern_to_uwc(pattern), *id))
+            .collect();
 
         // println!("nrows = {}, ncols = {}, nnz = {}, inc_nnz = {}", nrows, ncols, nnz, inc_nnz);
-        // println!("\n{:?}", distinct_patterns);
+        // println!("\nLen={}. {:?}\n", distinct_patterns.len(), distinct_patterns);
+        // println!("\nLen={}. {:?}\n", distinct_uwc.len(), distinct_uwc);
 
         return SPFGen {
             ast_list,
@@ -41,7 +57,8 @@ impl SPFGen {
             ncols,
             nnz,
             inc_nnz,
-            distinct_patterns
+            distinct_patterns,
+            distinct_uwc
         };
     }
 
@@ -53,42 +70,16 @@ impl SPFGen {
     }
 
     pub fn print_uwc_list(&self, show_eqs: bool) {
-        println!("Uwc_List:\nid\tU\t\tw\tc");
+        println!("Uwc List:\nid\tU\t\tw\tc");
         self.uwc_list.iter().for_each(|(id,(u,w,c))| {
-            print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, {
-                if show_eqs {
-                    let mut str_list: Vec<String> = vec![];
+            print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(u, w) } else { "\n".to_string() } });
+        });
+    }
 
-                    let idx_values = vec!["i", "j", "k", "l"];
-
-                    for i in 0..u.len() {
-                        str_list.push("   ===   ".to_string());
-                        for j in 0..u[i].len(){
-                            str_list.push(format!("{sign}{variable} {weight} >= 0", sign={
-                                match u[i][j] {
-                                    1 => "+".to_string(),
-                                    -1 => "-".to_string(),
-                                    0 => "".to_string(),
-                                    _ => u[i][j].to_string()
-                                }
-                            }, variable={
-                                match u[i][j] {
-                                    0 => "",
-                                    _ => idx_values[j]
-                                }
-                            }, weight={
-                                match w[i] {
-                                    0 => "\x08".to_string(),    // This adds a backspace for avoiding double space between variable and >=
-                                    _ => format!("{} {}", {if w[i] < 0 {"-"} else {"+"}}, w[i].abs())
-                                }
-                            }));
-                        }
-                    }
-                    str_list.push("\n".to_string());
-
-                    str_list.join("")
-                } else { "\n".to_string() }
-            });
+    pub fn print_distinct_uwc_list(&self, show_eqs: bool) {
+        println!("Distinct Uwc List:\nid\tU\t\tw\tc");
+        self.distinct_uwc.iter().for_each(|((u,w,c), id)| {
+            print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(u, w) } else { "\n".to_string() } });
         });
     }
 
@@ -126,7 +117,8 @@ impl SPFGen {
             file.write_i32::<LittleEndian>(0i32).unwrap();
         }
 
-        self.uwc_list.iter().filter(|(id,_)| id != ninc_nonzero_pattern_id).for_each(|(id,(u,w,c))| {
+        // println!("Writing u={:?}, w={:?}, c={:?} with id={:?}", u, w, c, id);
+        self.distinct_uwc.iter().filter(|(_,id)| *id != ninc_nonzero_pattern_id).for_each(|((u,w,c), id)| {
             // Write shape id
             file.write_i16::<LittleEndian>(*id as i16).unwrap();
             // Write type of encoding. 0 = vertex_rec, 1 = vertex_gen, 2 = ineqs . FIXME only writes vertex_rec
@@ -136,6 +128,8 @@ impl SPFGen {
             
             // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
             let ch: Vec<i32> = (w[1]..w[0]).collect();
+            
+            // Write minimal point
             // FIXME for higher dimensionality
             for _ in 0..1 {
                 file.write_i32::<LittleEndian>(ch[0]).unwrap();
@@ -157,7 +151,6 @@ impl SPFGen {
             for cc in c {
                 file.write_i32::<LittleEndian>(*cc).unwrap();
             }
-
         });
 
         // ast_list.iter().filter(|(_,_,(n,_,_))| *n == 1).count();    filter single values
@@ -170,15 +163,48 @@ impl SPFGen {
 // TODO fix this for n-dimensional (currently 1D only)
 #[inline(always)]
 #[allow(dead_code)]
-fn ast_to_uwc(ast: Piece) -> Uwc {
-    let (_, _, (n, i, j)) = ast;
+fn pattern_to_uwc(pattern: &Pattern) -> Uwc {
+    let (n, i, j) = pattern;
 
     let it_range = n-1;
 
     // TODO fix here for n-dimensional (currently 1D only)
     let u = vec![ vec![-1], vec![1] ];
     let w = vec![ it_range, 0 ];
-    let c = vec![ i, j ];
+    let c = vec![ *i, *j ];
 
     return (u, w, c);
+}
+
+fn format_eqs(u: &Vec<Vec<i32>>, w: &Vec<i32>) -> String {
+    let mut str_list: Vec<String> = vec![];
+
+    let idx_values = vec!["i", "j", "k", "l"];
+
+    for i in 0..u.len() {
+        str_list.push("   ===   ".to_string());
+        for j in 0..u[i].len(){
+            str_list.push(format!("{sign}{variable} {weight} >= 0", sign={
+                match u[i][j] {
+                    1 => "+".to_string(),
+                    -1 => "-".to_string(),
+                    0 => "".to_string(),
+                    _ => u[i][j].to_string()
+                }
+            }, variable={
+                match u[i][j] {
+                    0 => "",
+                    _ => idx_values[j]
+                }
+            }, weight={
+                match w[i] {
+                    0 => "\x08".to_string(),    // This adds a backspace for avoiding double space between variable and >=
+                    _ => format!("{} {}", {if w[i] < 0 {"-"} else {"+"}}, w[i].abs())
+                }
+            }));
+        }
+    }
+    str_list.push("\n".to_string());
+
+    str_list.join("")
 }
