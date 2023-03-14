@@ -4,9 +4,11 @@ extern crate text_io;
 use std::{env};
 
 mod spisearx;
+#[allow(unused_imports)]
 use spisearx::{SpISearxMatrix,SpISearxPatternsFlags};
 
 mod spgsearx;
+#[allow(unused_imports)]
 use spgsearx::{SpGSearxMatrix,SpGSearxPatternsFlags};
 
 use crate::spfgen::SPFGen;
