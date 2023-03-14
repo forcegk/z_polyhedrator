@@ -127,7 +127,7 @@ impl SPFGen {
             file.write_i16::<LittleEndian>(u[0].len() as i16).unwrap();
             
             // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
-            let ch: Vec<i32> = (w[1]..w[0]).collect();
+            let ch: Vec<i32> = convex_hull_1d(u, w, false);
             
             // Write minimal point
             // FIXME for higher dimensionality
@@ -153,10 +153,49 @@ impl SPFGen {
             }
         });
 
-        // ast_list.iter().filter(|(_,_,(n,_,_))| *n == 1).count();    filter single values
+        // We also know that regular pieces are at the end of the list
+        let piece_cutoff = self.uwc_list.iter().filter(|(id,_)| id != ninc_nonzero_pattern_id).count();
+        // println!("Piece cutoff = {}", piece_cutoff); 
 
+        // VERY IMPORTANT! Remember that uwc_list and ast_list have to be in the same order for this to be coherent
+        let mut data_offset: i32 = 0;
+        for idx in 0..piece_cutoff {
+            let (id,(u,w,c)) = &self.uwc_list[idx];
 
+            // Write shape id
+            file.write_i16::<LittleEndian>(*id as i16).unwrap();
 
+            // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
+            let ch: Vec<i32> = convex_hull_1d(u, w, true);
+
+            // Write coordinates of AST's starting point
+            file.write_i32::<LittleEndian>(self.ast_list[idx].0 as i32).unwrap(); // row
+            file.write_i32::<LittleEndian>(self.ast_list[idx].1 as i32).unwrap(); // col
+            file.write_i32::<LittleEndian>(data_offset).unwrap();                 // data offset
+            data_offset += ch.len() as i32;   // Offset in elements. no judgment about data type
+        }
+
+        // Codes here:
+        //  -> CSR = 0
+        //  -> ??? = 1
+        //  -> COO = 2
+        let csr_size = self.nrows + 1 + (self.nnz - self.inc_nnz);
+        let coo_size = 2 * (self.nnz - self.inc_nnz);
+
+        let uninc_format: u8 = { if csr_size <= coo_size { 0u8 }
+                                 else { 2u8 }};
+        file.write_u8(uninc_format).unwrap();
+
+        // TODO write CSR // COO dump codes
+        match uninc_format {
+            0 => { println!("Writing CSR") },
+            2 => { println!("Writing COO") },
+            _ => { panic!("The hell did you did here man") }
+        }
+
+        // TODO translate from line 809 onwards
+
+        // ES VERDAD QUE NO HAY QUE HACER FILE CLOSE :)
     }
 }
 
@@ -207,4 +246,9 @@ fn format_eqs(u: &Vec<Vec<i32>>, w: &Vec<i32>) -> String {
     str_list.push("\n".to_string());
 
     str_list.join("")
+}
+
+fn convex_hull_1d(_u: &Vec<Vec<i32>>, w: &Vec<i32>, _dense: bool) -> Vec<i32>{
+    // FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore :)
+    (w[1]..w[0]).collect::<Vec<i32>>()
 }
