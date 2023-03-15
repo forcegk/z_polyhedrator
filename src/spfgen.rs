@@ -1,7 +1,8 @@
-use std::{fs::{File, self}, path::PathBuf, collections::{HashSet,HashMap}};
+use std::{fs::{File, self}, path::PathBuf, collections::HashSet, io::{SeekFrom, Seek}};
 
 use byteorder::{WriteBytesExt, LittleEndian};
 use linked_hash_map::LinkedHashMap;
+use sprs::CsMat;
 
 type Pattern = (i32, i32, i32);
 type Piece = (usize, usize, Pattern);
@@ -83,11 +84,13 @@ impl SPFGen {
         });
     }
 
-    pub fn write_spf(&self, file_path: &str) {
+    pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str) {
+        // Read matrixmarket f64 value matrix
+        let f64_value_matrix: CsMat<f64> = sprs::io::read_matrix_market(input_value_matrix).unwrap().to_csr();
         
-        let mut file = File::create(file_path).expect(format!("Unable to create file {}", file_path).as_str());
+        let mut file = File::create(output_file_path).expect(format!("Unable to create file {}", output_file_path).as_str());
         
-        let path = PathBuf::from(file_path);
+        let path = PathBuf::from(output_file_path);
         println!("Writing to file {}", fs::canonicalize(&path).unwrap().display());
         
         // Get index of single nonzeros (not in a pattern to filter them out of the next foreach)
@@ -186,14 +189,45 @@ impl SPFGen {
                                  else { 2u8 }};
         file.write_u8(uninc_format).unwrap();
 
+        // VERY IMPORTANT REMOVE HERE (HARDCODE COO)
+        let uninc_format: u8 = 2;    // TODO REMOVE
+
         // TODO write CSR // COO dump codes
         match uninc_format {
-            0 => { println!("Writing CSR") },
-            2 => { println!("Writing COO") },
-            _ => { panic!("The hell did you did here man") }
+            0 => {  println!("Writing CSR");
+                    panic!("Not implemented!")
+                 },
+            2 => {  println!("Writing COO");
+                    print!("Writing Rowptr: ");
+                    for coo_idx in piece_cutoff..self.uwc_list.len() {
+                        print!("{} ", self.ast_list[coo_idx].0);
+                        file.write_i32::<LittleEndian>(self.ast_list[coo_idx].0 as i32).unwrap(); // Write rowptr
+                    }
+                    print!("\nWriting Colptr: ");
+                    for coo_idx in piece_cutoff..self.uwc_list.len() {
+                        print!("{} ", self.ast_list[coo_idx].1);
+                        file.write_i32::<LittleEndian>(self.ast_list[coo_idx].1 as i32).unwrap(); // Write colptr
+                    }
+                    println!();
+                 },
+            _ => { panic!("The hell you did here man") }
         }
 
-        // TODO translate from line 809 onwards
+        // Save current position for later
+        let curr_pos = file.seek(SeekFrom::Current(0)).unwrap();
+
+        // And rewrite pointer to start of data
+        file.seek(SeekFrom::Start(26)).unwrap();
+        file.write_i32::<LittleEndian>(curr_pos as i32).unwrap();
+        file.seek(SeekFrom::Start(curr_pos)).unwrap();
+
+        // f.write( struct.pack( len(self.mask)*"d", *mat.data[self.reorder] ) )
+        self.ast_list.iter().for_each(|(row,col,(n,i,j))| {
+            for ii in 0..*n {
+                let position = f64_value_matrix.get((*row as i64 + (*i as i64 * ii as i64)) as usize, (*col as i64 + (*j as i64 * ii as i64)) as usize).unwrap();
+                file.write_f64::<LittleEndian>(*position).unwrap();
+            }
+        });
 
         // ES VERDAD QUE NO HAY QUE HACER FILE CLOSE :)
     }

@@ -55,6 +55,6 @@ fn main() {
 
     spfgen.print_distinct_uwc_list(true);
 
-    spfgen.write_spf("output.spf")
+    spfgen.write_spf(matrixmarket_file_path, "output.spf")
 
 }
