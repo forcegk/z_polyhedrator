@@ -87,6 +87,11 @@ impl SPFGen {
     pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str) {
         // Read matrixmarket f64 value matrix
         let f64_value_matrix: CsMat<f64> = sprs::io::read_matrix_market(input_value_matrix).unwrap().to_csr();
+
+        // Quick sanity check
+        if f64_value_matrix.nnz() != self.nnz {
+            panic!("NNZ of value matrix and pattern list do not match. Maybe double check your params?");
+        }
         
         let mut file = File::create(output_file_path).expect(format!("Unable to create file {}", output_file_path).as_str());
         
@@ -128,6 +133,7 @@ impl SPFGen {
             file.write_i16::<LittleEndian>(0i16).unwrap();
             // Write dimension of i_p. Hardcodec for vertex_rec
             file.write_i16::<LittleEndian>(u[0].len() as i16).unwrap();
+            // println!("    - Dimension of i_p = {}", u[0].len());
             
             // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
             let ch: Vec<i32> = convex_hull_1d(u, w, false);
@@ -136,13 +142,15 @@ impl SPFGen {
             // FIXME for higher dimensionality
             for _ in 0..1 {
                 file.write_i32::<LittleEndian>(ch[0]).unwrap();
+                // println!("    - Minimal point from ch[0] = {}", ch[0]);
             }
 
             // Write lenghts along axis            
             // FIXME for higher dimensionality
             for _ in 0..1 {
                 // taking shortcut as all input are 1-d
-                file.write_i32::<LittleEndian>(w[0]-w[1]).unwrap();
+                file.write_i32::<LittleEndian>(w[0]-w[1]-1).unwrap();
+                // println!("    - Lenghts along axes from from w[0]-[w1]-1 = {}  ==  {} = ch[-1]-ch[0]", w[0]-w[1]-1, ch[ch.len()-1]-ch[0]);
             }
 
             // "Hardcoded stride at this time"
@@ -154,11 +162,15 @@ impl SPFGen {
             for cc in c {
                 file.write_i32::<LittleEndian>(*cc).unwrap();
             }
+            // println!("c = {:?}", c);
         });
 
         // We also know that regular pieces are at the end of the list
         let piece_cutoff = self.uwc_list.iter().filter(|(id,_)| id != ninc_nonzero_pattern_id).count();
-        // println!("Piece cutoff = {}", piece_cutoff); 
+        // println!("Piece cutoff = {}", piece_cutoff);
+
+        // Write total number of origins
+        file.write_i32::<LittleEndian>(piece_cutoff as i32).unwrap();
 
         // VERY IMPORTANT! Remember that uwc_list and ast_list have to be in the same order for this to be coherent
         let mut data_offset: i32 = 0;
@@ -191,6 +203,7 @@ impl SPFGen {
         // VERY IMPORTANT REMOVE HERE (HARDCODE COO)
         let uninc_format: u8 = 2;    // TODO REMOVE
 
+        print!("Writing uninc_format = {} to offset {:x}... ", uninc_format, file.seek(SeekFrom::Current(0)).unwrap());
         file.write_u8(uninc_format).unwrap();
 
         // TODO write CSR // COO dump codes
