@@ -187,10 +187,11 @@ impl SPFGen {
 
         let uninc_format: u8 = { if csr_size <= coo_size { 0u8 }
                                  else { 2u8 }};
-        file.write_u8(uninc_format).unwrap();
 
         // VERY IMPORTANT REMOVE HERE (HARDCODE COO)
         let uninc_format: u8 = 2;    // TODO REMOVE
+
+        file.write_u8(uninc_format).unwrap();
 
         // TODO write CSR // COO dump codes
         match uninc_format {
@@ -249,6 +250,8 @@ fn pattern_to_uwc(pattern: &Pattern) -> Uwc {
     return (u, w, c);
 }
 
+#[inline(always)]
+#[allow(dead_code)]
 fn format_eqs(u: &Vec<Vec<i32>>, w: &Vec<i32>) -> String {
     let mut str_list: Vec<String> = vec![];
 
@@ -282,6 +285,8 @@ fn format_eqs(u: &Vec<Vec<i32>>, w: &Vec<i32>) -> String {
     str_list.join("")
 }
 
+#[inline(always)]
+#[allow(dead_code)]
 fn convex_hull_1d(_u: &Vec<Vec<i32>>, w: &Vec<i32>, _dense: bool) -> Vec<i32>{
     // FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore :)
     (w[1]..w[0]).collect::<Vec<i32>>()
