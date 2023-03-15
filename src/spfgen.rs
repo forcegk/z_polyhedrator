@@ -113,7 +113,7 @@ impl SPFGen {
         file.write_i32::<LittleEndian>(0i32).unwrap();
 
         // Write maximum dimensionality of iP for vertex_rec (FIXME this currently only supports 1d)
-        file.write_i16::<LittleEndian>(0i16).unwrap();
+        file.write_i16::<LittleEndian>(1i16).unwrap();
 
         // FIXME Get shape_dims_max from previous it
         for _ in 0..1 {
