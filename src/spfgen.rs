@@ -149,8 +149,8 @@ impl SPFGen {
             // FIXME for higher dimensionality
             for _ in 0..1 {
                 // taking shortcut as all input are 1-d
-                file.write_i32::<LittleEndian>(w[0]-w[1]-1).unwrap();
-                // println!("    - Lenghts along axes from from w[0]-[w1]-1 = {}  ==  {} = ch[-1]-ch[0]", w[0]-w[1]-1, ch[ch.len()-1]-ch[0]);
+                file.write_i32::<LittleEndian>(w[0]-w[1]).unwrap();
+                // println!("    - Lenghts along axes from from w[0]-[w1] = {}  ==  {} = ch[-1]-ch[0]", w[0]-w[1], ch[ch.len()-1]-ch[0]);
             }
 
             // "Hardcoded stride at this time"
@@ -302,5 +302,5 @@ fn format_eqs(u: &Vec<Vec<i32>>, w: &Vec<i32>) -> String {
 #[allow(dead_code)]
 fn convex_hull_1d(_u: &Vec<Vec<i32>>, w: &Vec<i32>, _dense: bool) -> Vec<i32>{
     // FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore :)
-    (w[1]..w[0]).collect::<Vec<i32>>()
+    (w[1]..=w[0]).collect::<Vec<i32>>()
 }
