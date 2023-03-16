@@ -41,7 +41,10 @@ fn main() {
     //     // | spisearx::SpISearxPatternsFlags::PrintInformation
     // );
 
-    base_matrix.search_patterns(spgsearx::SpGSearxPatternsFlags::NoFlags);
+    base_matrix.search_patterns(spgsearx::SpGSearxPatternsFlags::NoFlags
+        | spgsearx::SpGSearxPatternsFlags::PatternFirst
+        // | spgsearx::SpGSearxPatternsFlags::CellFirst
+    );
 
     println!("\n\n---------------------------------------------------------\n");
     // base_matrix.print_pieces();

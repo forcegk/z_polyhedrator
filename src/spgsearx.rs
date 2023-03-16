@@ -6,9 +6,6 @@ use bitflags::bitflags;
 type Pattern = (i32, i32, i32);
 type Piece = (usize, usize, Pattern);
 
-type Prio = usize;
-const NO_PRIO: Prio = std::usize::MAX;
-
 pub struct SpGSearxMatrix {
     value_matrix: CsMat<bool>,
     // exploration_matrix: Vec<Prio>,
@@ -22,6 +19,8 @@ pub struct SpGSearxMatrix {
 bitflags! {
     pub struct SpGSearxPatternsFlags: u64 {
         const NoFlags               = 0b0000_0000;
+        const PatternFirst          = 0b0000_0001;
+        const CellFirst            = 0b0000_0010;
     }
 }
 
@@ -88,40 +87,74 @@ impl SpGSearxMatrix {
     pub fn search_patterns(&mut self, flags: SpGSearxPatternsFlags) {
         // Parse possible flags
         // let skip_on_invalidation = flags.contains(SpGSearxPatternsFlags::SkipOnInvalidation);
-        
-        // Generate access positions
-        let mut nonzero_positions: Vec<(usize, usize)> = Vec::new();
-        self.value_matrix.iter().for_each(|(_, (row, col))| {
-            nonzero_positions.push((row,col));
-        });
-        
-        // First pass looking for patterns
-        nonzero_positions.iter().enumerate().for_each(|(_it, &(row, col))| {
-            let mut found: bool = false;
-            let mut piece: Piece = (0,0,(0,0,0));
-            'pattern_search: for pattern in self.patterns.iter(){
-                let result = check_pattern(&self.value_matrix, (row,col), pattern);
-                match result {
-                    None => continue,
-                    Some(found_piece) => {
-                        found = true;
-                        piece = found_piece;
-                        break 'pattern_search;
-                    },
-                }
-            }
 
-            if found {
-                // set places to found and add piece
-                let (x,y,(n,i,j)) = piece;
-                for ii in 0..n {
-                    let pos_val = self.value_matrix.get_mut((x as i64 + (i as i64 * ii as i64)) as usize, (y as i64 + (j as i64 * ii as i64)) as usize).unwrap();
-                    *pos_val = true;
+        let pattern_first = flags.contains(SpGSearxPatternsFlags::PatternFirst);
+        let cell_first = flags.contains(SpGSearxPatternsFlags::CellFirst);
+
+        if !(pattern_first ^ cell_first) {
+            panic!("Specify only one search priority flag!");
+        }
+        
+        if cell_first {
+            // Generate access positions
+            let mut nonzero_positions: Vec<(usize, usize)> = Vec::new();
+            self.value_matrix.iter().for_each(|(_, (row, col))| {
+                nonzero_positions.push((row,col));
+            });
+
+            // First pass looking for patterns
+            nonzero_positions.iter().enumerate().for_each(|(_it, &(row, col))| {
+                let mut found: bool = false;
+                let mut piece: Piece = (0,0,(0,0,0));
+                'pattern_search: for pattern in self.patterns.iter(){
+                    let result = check_pattern(&self.value_matrix, (row,col), pattern);
+                    match result {
+                        None => continue,
+                        Some(found_piece) => {
+                            found = true;
+                            piece = found_piece;
+                            break 'pattern_search;
+                        },
+                    }
                 }
 
-                self.found_pieces.push(piece);
-            }
-        });
+                if found {
+                    // set places to found and add piece
+                    let (x,y,(n,i,j)) = piece;
+                    for ii in 0..n {
+                        let pos_val = self.value_matrix.get_mut((x as i64 + (i as i64 * ii as i64)) as usize, (y as i64 + (j as i64 * ii as i64)) as usize).unwrap();
+                        *pos_val = true;
+                    }
+
+                    self.found_pieces.push(piece);
+                }
+            });
+        }
+
+        if pattern_first {
+            self.patterns.iter().for_each(|pattern| {
+
+                let mut nonzero_positions: Vec<(usize, usize)> = Vec::new();
+                self.value_matrix.iter().filter(|(val, (_,_))| !**val).for_each(|(_, (row, col))| {
+                    nonzero_positions.push((row,col));
+                });
+
+                for (row,col) in nonzero_positions {
+                    let result = check_pattern(&self.value_matrix, (row,col), pattern);
+                    match result {
+                        None => continue,
+                        Some(found_piece) => {
+                            let (x,y,(n,i,j)) = found_piece;
+                            for ii in 0..n {
+                                let pos_val = self.value_matrix.get_mut((x as i64 + (i as i64 * ii as i64)) as usize, (y as i64 + (j as i64 * ii as i64)) as usize).unwrap();
+                                *pos_val = true;
+                            }
+                            self.found_pieces.push(found_piece);
+                        },
+                    }
+                }
+            });
+        }
 
         // Add last nonzeros
         self.value_matrix.iter().for_each(|(&val, (row, col))| {
@@ -155,15 +188,21 @@ fn check_pattern(csmat: &CsMat<bool>, curr_pos: (usize, usize), pattern: &Patter
 
     // println!("{:?}", (x,y,n,i,j));
 
+    // Discard already dumped patterns without computing bounds first
+    if *csmat.get(x,y).unwrap() {
+        return None;
+    }
+
     let max_pos_x = x as i64 + (n-1) as i64 * i as i64;
     let max_pos_y = y as i64 + (n-1) as i64 * j as i64;
 
     // Discard out-of-bounds patterns
-    if *csmat.get(x,y).unwrap() || max_pos_x < 0 || max_pos_x >= csmat.rows() as i64 || max_pos_y < 0 || max_pos_y >= csmat.cols() as i64 {
+    if max_pos_x < 0 || max_pos_x >= csmat.rows() as i64 || max_pos_y < 0 || max_pos_y >= csmat.cols() as i64 {
         return None;
     }
 
-    for ii in 0..n {
+    // We can start on the next pattern
+    for ii in 1..n {
         let position = csmat.get((x as i64 + (i as i64 * ii as i64)) as usize, (y as i64 + (j as i64 * ii as i64)) as usize);
         match position {
             Some(&is_in_pat) => {
