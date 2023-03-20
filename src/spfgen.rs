@@ -2,7 +2,7 @@ use std::{fs::{File, self}, path::PathBuf, collections::HashSet, io::{SeekFrom, 
 
 use byteorder::{WriteBytesExt, LittleEndian};
 use linked_hash_map::LinkedHashMap;
-use sprs::CsMat;
+use sprs::{CsMat, TriMat};
 
 type Pattern = (i32, i32, i32);
 type Piece = (usize, usize, Pattern);
@@ -200,16 +200,32 @@ impl SPFGen {
         let uninc_format: u8 = { if csr_size <= coo_size { 0u8 }
                                  else { 2u8 }};
 
-        // VERY IMPORTANT REMOVE HERE (HARDCODE COO)
-        let uninc_format: u8 = 2;    // TODO REMOVE
-
-        print!("Writing uninc_format = {} to offset {:x}... ", uninc_format, file.seek(SeekFrom::Current(0)).unwrap());
+        print!("Writing uninc_format = {} to offset 0x{:X}... ", uninc_format, file.seek(SeekFrom::Current(0)).unwrap());
         file.write_u8(uninc_format).unwrap();
 
         // TODO write CSR // COO dump codes
         match uninc_format {
             0 => {  println!("Writing CSR");
-                    panic!("Not implemented!")
+                    // panic!("Not implemented!")
+                    let mut local_csr_mat: TriMat<u8> = TriMat::new((self.nrows, self.ncols));
+                    print!("Writing points: [");
+                    for csr_idx in piece_cutoff..self.uwc_list.len() {
+                        print!("({},{}) ", self.ast_list[csr_idx].0, self.ast_list[csr_idx].1);
+                        local_csr_mat.add_triplet(self.ast_list[csr_idx].0, self.ast_list[csr_idx].1, 1u8);
+                    }
+                    let local_csr_mat: CsMat<u8> = local_csr_mat.to_csr();
+
+                    println!("\x08] with:\nind_ptr: {:?}", local_csr_mat.proper_indptr());
+                    println!("indices: {:?}", local_csr_mat.indices());
+
+                    // Write rowptr/indptr
+                    local_csr_mat.proper_indptr().iter().for_each(|iptr_val| {
+                        file.write_i32::<LittleEndian>(*iptr_val as i32).unwrap();
+                    });
+                    // Write colptr/indices
+                    local_csr_mat.indices().iter().for_each(|ind_val| {
+                        file.write_i32::<LittleEndian>(*ind_val as i32).unwrap();
+                    });
                  },
             2 => {  println!("Writing COO");
                     print!("Writing Rowptr: ");

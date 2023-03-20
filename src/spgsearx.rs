@@ -26,7 +26,7 @@ bitflags! {
 
 impl SpGSearxMatrix {
     pub fn from_file(path: &str) -> SpGSearxMatrix {
-        let f64_value_matrix: CsMat<f64> = sprs::io::read_matrix_market(path).unwrap().to_csc();
+        let f64_value_matrix: CsMat<f64> = sprs::io::read_matrix_market(path).unwrap().to_csr();
 
         // println!("{:?}", (f64_value_matrix.rows(), f64_value_matrix.cols(), f64_value_matrix.nnz()));
         // f64_value_matrix.iter().for_each(|(&val, (row, col))| {
