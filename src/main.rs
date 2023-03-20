@@ -18,15 +18,6 @@ use spfgen::SPFGen;
 mod utils;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-
-    // if args.len() < 3 {
-    //     println!("Usage: {} <patterns_file> <matrixmarket_file> [<output_file>]", args[0]);
-    //     return;
-    // }
-    // let patterns_file_path = &args[1];
-    // let matrixmarket_file_path = &args[2];
-
     let flags = xflags::parse_or_exit! {
         /// File containing pattern list
         required patterns_file_path: PathBuf

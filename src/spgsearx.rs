@@ -48,7 +48,6 @@ impl SpGSearxMatrix {
         //     println!("{}: [{},{}]", val, row, col);
         // });
 
-
         return SpGSearxMatrix {
             value_matrix: value_matrix,
             // exploration_matrix: exploration_matrix,
