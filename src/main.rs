@@ -31,7 +31,7 @@ fn main() {
         /// File containing pattern list
         required patterns_file_path: PathBuf
 
-        // Input MatrixMarket file
+        /// Input MatrixMarket file
         required matrixmarket_file_path: PathBuf
         
         /// Write to custom SPF file. By default writes to matrix_market_file.mtx.spf
