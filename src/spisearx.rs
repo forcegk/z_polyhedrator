@@ -2,6 +2,7 @@ use sprs::{CsMat,TriMat};
 use std::{io::BufRead};
 use text_io::scan;
 use bitflags::bitflags;
+use crate::utils;
 
 /* DATATYPES */
 type Pattern = (i32, i32, i32);
@@ -46,7 +47,7 @@ bitflags! {
 
 impl SpISearxMatrix {
     pub fn from_file(path: &str) -> SpISearxMatrix {
-        let value_matrix = sprs::io::read_matrix_market(path).unwrap().to_csr();
+        let value_matrix = utils::read_matrix_market_csr(path);
         let (numrows, numcols) = (value_matrix.rows(), value_matrix.cols());
         let nonzeros = value_matrix.nnz();
         let mut exploration_matrix = TriMat::new((numrows, numcols));

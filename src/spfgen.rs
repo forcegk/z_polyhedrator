@@ -3,6 +3,7 @@ use std::{fs::{File, self}, path::PathBuf, collections::HashSet, io::{SeekFrom, 
 use byteorder::{WriteBytesExt, LittleEndian};
 use linked_hash_map::LinkedHashMap;
 use sprs::{CsMat, TriMat};
+use crate::utils;
 
 type Pattern = (i32, i32, i32);
 type Piece = (usize, usize, Pattern);
@@ -86,7 +87,7 @@ impl SPFGen {
 
     pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str) {
         // Read matrixmarket f64 value matrix
-        let f64_value_matrix: CsMat<f64> = sprs::io::read_matrix_market(input_value_matrix).unwrap().to_csr();
+        let f64_value_matrix: CsMat<f64> = utils::read_matrix_market_csr(input_value_matrix);
 
         // Quick sanity check
         if f64_value_matrix.nnz() != self.nnz {

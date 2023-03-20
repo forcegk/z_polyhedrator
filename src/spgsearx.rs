@@ -1,7 +1,8 @@
 use text_io::scan;
-use std::{io::BufRead};
-use sprs::{CsMat};
+use std::io::BufRead;
+use sprs::CsMat;
 use bitflags::bitflags;
+use crate::utils;
 
 type Pattern = (i32, i32, i32);
 type Piece = (usize, usize, Pattern);
@@ -20,13 +21,13 @@ bitflags! {
     pub struct SpGSearxPatternsFlags: u64 {
         const NoFlags               = 0b0000_0000;
         const PatternFirst          = 0b0000_0001;
-        const CellFirst            = 0b0000_0010;
+        const CellFirst             = 0b0000_0010;
     }
 }
 
 impl SpGSearxMatrix {
     pub fn from_file(path: &str) -> SpGSearxMatrix {
-        let f64_value_matrix: CsMat<f64> = sprs::io::read_matrix_market(path).unwrap().to_csr();
+        let f64_value_matrix: CsMat<f64> = utils::read_matrix_market_csr(path);
 
         // println!("{:?}", (f64_value_matrix.rows(), f64_value_matrix.cols(), f64_value_matrix.nnz()));
         // f64_value_matrix.iter().for_each(|(&val, (row, col))| {
