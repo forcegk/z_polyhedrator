@@ -9,9 +9,10 @@ pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str) -> CsMat<T> {
         match sprs::io::read_matrix_market(path) {
             Ok(mat) => {mat.to_csr()},
             Err(_) => {
-                println!(
-                    "\n{} MatrixMarket file was incompatible with sprs crate. Trying to convert it on the fly...",
-                    "[IMPORTANT]".bold().red()
+                eprintln!(
+                    "\n{} MatrixMarket file was incompatible with {} crate. Trying to convert it on the fly...",
+                    "[IMPORTANT]".bold().red(),
+                    "sprs".green()
                 );
 
                 let cmd_output = Command::new("python3")
@@ -25,7 +26,7 @@ pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str) -> CsMat<T> {
                 let streader = StringReader::new(&stdout);
                 let mut bufreader = BufReader::new(streader);
 
-                println!(
+                eprintln!(
                     "{} MatrixMarket file was converted succesfully. If the files will be accessed often, seriously consider transcoding it with the tool located on {} for efficient CPU usage and faster runtime.\n",
                     "[INFO]".bold().blue(),
                     "./utils/transcode_mm.py".bright_blue()
