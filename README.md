@@ -4,7 +4,7 @@
 
 ## Installation
 
-You will need the latest version of the [rust toolchain](https://rustup.rs) to compile matrix_rs.
+You will need the latest version of the [rust toolchain](https://rustup.rs) to compile matrix_rs. To use the python utils you will also need [python3(.11.2)](https://www.python.org/downloads/) installed and in the $PATH, along with all packages from `utils/requirements.txt` installed.
 
 ### Debug build
 To build the debug version the next command can be run
