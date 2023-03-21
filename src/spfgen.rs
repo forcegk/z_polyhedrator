@@ -64,6 +64,7 @@ impl SPFGen {
         };
     }
 
+    #[allow(dead_code)]
     pub fn print_ast_list(&self) {
         println!("AST_List:\nRow\tCol\tN\tI\tJ");
         self.ast_list.iter().for_each(|(row, col, (n, i, j))| {
@@ -97,7 +98,7 @@ impl SPFGen {
         let mut file = File::create(output_file_path).expect(format!("Unable to create file {}", output_file_path).as_str());
         
         let path = PathBuf::from(output_file_path);
-        println!("Writing to file {}", fs::canonicalize(&path).unwrap().display());
+        eprintln!("Writing to file {}", fs::canonicalize(&path).unwrap().display());
         
         // Get index of single nonzeros (not in a pattern to filter them out of the next foreach)
         let ninc_nonzero_pattern_id = self.distinct_patterns.get(&(1,0,0)).unwrap();
@@ -176,7 +177,7 @@ impl SPFGen {
         // VERY IMPORTANT! Remember that uwc_list and ast_list have to be in the same order for this to be coherent
         let mut data_offset: i32 = 0;
         for idx in 0..piece_cutoff {
-            let (id,(u,w,c)) = &self.uwc_list[idx];
+            let (id,(u,w,_)) = &self.uwc_list[idx];
 
             // Write shape id
             file.write_i16::<LittleEndian>(*id as i16).unwrap();
@@ -201,23 +202,23 @@ impl SPFGen {
         let uninc_format: u8 = { if csr_size <= coo_size { 0u8 }
                                  else { 2u8 }};
 
-        print!("Writing uninc_format = {} to offset 0x{:X}... ", uninc_format, file.seek(SeekFrom::Current(0)).unwrap());
+        eprint!("Writing uninc_format = {} to offset 0x{:X}... ", uninc_format, file.seek(SeekFrom::Current(0)).unwrap());
         file.write_u8(uninc_format).unwrap();
 
         // TODO write CSR // COO dump codes
         match uninc_format {
-            0 => {  println!("Writing CSR");
+            0 => {  eprintln!("Writing CSR");
                     // panic!("Not implemented!")
                     let mut local_csr_mat: TriMat<u8> = TriMat::new((self.nrows, self.ncols));
-                    print!("Writing points: [");
+                    eprint!("Writing points: [");
                     for csr_idx in piece_cutoff..self.uwc_list.len() {
                         print!("({},{}) ", self.ast_list[csr_idx].0, self.ast_list[csr_idx].1);
                         local_csr_mat.add_triplet(self.ast_list[csr_idx].0, self.ast_list[csr_idx].1, 1u8);
                     }
                     let local_csr_mat: CsMat<u8> = local_csr_mat.to_csr();
 
-                    println!("\x08] with:\nind_ptr: {:?}", local_csr_mat.proper_indptr());
-                    println!("indices: {:?}", local_csr_mat.indices());
+                    eprintln!("\x08] with:\nind_ptr: {:?}", local_csr_mat.proper_indptr());
+                    eprintln!("indices: {:?}", local_csr_mat.indices());
 
                     // Write rowptr/indptr
                     local_csr_mat.proper_indptr().iter().for_each(|iptr_val| {
@@ -228,18 +229,18 @@ impl SPFGen {
                         file.write_i32::<LittleEndian>(*ind_val as i32).unwrap();
                     });
                  },
-            2 => {  println!("Writing COO");
-                    print!("Writing Rowptr: ");
+            2 => {  eprintln!("Writing COO");
+                    eprint!("Writing Rowptr: ");
                     for coo_idx in piece_cutoff..self.uwc_list.len() {
                         print!("{} ", self.ast_list[coo_idx].0);
                         file.write_i32::<LittleEndian>(self.ast_list[coo_idx].0 as i32).unwrap(); // Write rowptr
                     }
-                    print!("\nWriting Colptr: ");
+                    eprint!("\nWriting Colptr: ");
                     for coo_idx in piece_cutoff..self.uwc_list.len() {
-                        print!("{} ", self.ast_list[coo_idx].1);
+                        eprint!("{} ", self.ast_list[coo_idx].1);
                         file.write_i32::<LittleEndian>(self.ast_list[coo_idx].1 as i32).unwrap(); // Write colptr
                     }
-                    println!();
+                    eprintln!();
                  },
             _ => { panic!("The hell you did here man") }
         }

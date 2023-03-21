@@ -1,13 +1,10 @@
 extern crate sprs;
 extern crate text_io;
 
-use std::{env, path::PathBuf};
-
-mod spisearx;
-#[allow(unused_imports)]
-use spisearx::{SpISearxMatrix,SpISearxPatternsFlags};
+use std::{path::PathBuf, process::exit};
 
 mod spgsearx;
+use colored::Colorize;
 #[allow(unused_imports)]
 use spgsearx::{SpGSearxMatrix,SpGSearxPatternsFlags};
 
@@ -24,55 +21,88 @@ fn main() {
 
         /// Input MatrixMarket file
         required matrixmarket_file_path: PathBuf
-        
+
+        /// Print patterns parsed from pattern list
+        optional --print-pattern-list
+
+        /// [2D SEARCH] Search Flags. Valid options: {[PatternFirst], CellFirst} where [] = default.
+        optional --search-flags search_flags: String
+
         /// Write to custom SPF file. By default writes to matrix_market_file.mtx.spf
         optional -w,--write-spf output_spf_file_path: PathBuf
+
+        /// Print piece list (AST list)
+        optional --print-ast-list
+
+        /// Print uwc lists
+        optional --print-uwc-list
     };
 
     let patterns_file_path = flags.patterns_file_path.to_str().unwrap();
     let matrixmarket_file_path = flags.matrixmarket_file_path.to_str().unwrap();
     
-    let output_spf_file_path: String;
-    match flags.write_spf {
-        Some(path) => output_spf_file_path = String::from(path.to_str().unwrap()),
-        None => output_spf_file_path = {
-            let mut lstr = String::from(flags.matrixmarket_file_path.file_name().unwrap().to_str().unwrap());
-            lstr.push_str(".spf");
-            lstr
+    let output_spf_file_path: (bool, String);
+    output_spf_file_path = {
+        if flags.write_spf.as_ref().is_some() {
+            (true, String::from(flags.write_spf.unwrap().to_str().unwrap()))
+        } else {
+            (false, String::new())
         }
-    }
+    };
+
+    let search_flags = {
+        let mut l_search_flags = spgsearx::SpGSearxPatternsFlags::NoFlags;
+
+        if flags.search_flags.is_some() {
+            match flags.search_flags.unwrap().as_str() {
+                "PatternFirst" => l_search_flags |= spgsearx::SpGSearxPatternsFlags::PatternFirst,
+                "CellFirst" => l_search_flags |= spgsearx::SpGSearxPatternsFlags::CellFirst,
+                def => {
+                    eprintln!("invalid value `{}` for `--search-flags`. Valid options: {{[PatternFirst], CellFirst}} where [] = default.", def);
+                    exit(-1);
+                }
+            }
+        } else {
+            l_search_flags |= spgsearx::SpGSearxPatternsFlags::PatternFirst;
+        }
+
+        l_search_flags
+    };
 
     /* -------- PARSE -------- */
-    println!("Opening matrixmarket file: {}", matrixmarket_file_path);
-    // let mut base_matrix: SpISearxMatrix = SpISearxMatrix::from_file(matrixmarket_file_path);
+    eprintln!("{} Opening matrixmarket file: {}", "[INFO]".cyan().bold(), matrixmarket_file_path);
     let mut base_matrix: SpGSearxMatrix = SpGSearxMatrix::from_file(matrixmarket_file_path);
     
-    println!("Opening patterns file: {}", patterns_file_path);
+    eprintln!("{} Opening patterns file: {}", "[INFO]".cyan().bold(), patterns_file_path);
     base_matrix.load_patterns(patterns_file_path);
 
-    // base_matrix.print_patterns();
 
-    // base_matrix.search_patterns(spisearx::SpISearxPatternsFlags::NoFlags
-    //     | spisearx::SpISearxPatternsFlags::SkipOnInvalidation
-    //     | spisearx::SpISearxPatternsFlags::SkipOnPatternSearch
-    //     // | spisearx::SpISearxPatternsFlags::PrintInformation
-    // );
+    if flags.print_pattern_list {
+        eprintln!("--- Pattern list ---");
+        base_matrix.print_patterns();
+    }
 
-    base_matrix.search_patterns(spgsearx::SpGSearxPatternsFlags::NoFlags
-        | spgsearx::SpGSearxPatternsFlags::PatternFirst
-        // | spgsearx::SpGSearxPatternsFlags::CellFirst
-    );
+    base_matrix.search_patterns(search_flags);
 
-    println!("\n\n---------------------------------------------------------\n");
-    // base_matrix.print_pieces();
+    if flags.print_ast_list {
+        base_matrix.print_pieces();
+    }
 
-    let spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list(), base_matrix.numrows, base_matrix.numcols, base_matrix.nonzeros);
+    if flags.print_uwc_list || output_spf_file_path.0 {
+        let spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list(), base_matrix.numrows, base_matrix.numcols, base_matrix.nonzeros);
 
-    spfgen.print_ast_list();
+        // Already done before
+        // if flags.print_ast_list {
+        //     spfgen.print_ast_list();
+        // }
 
-    spfgen.print_uwc_list(true);
+        if flags.print_uwc_list {
+            spfgen.print_uwc_list(true);
+            spfgen.print_distinct_uwc_list(true);
+        }
 
-    spfgen.print_distinct_uwc_list(true);
-
-    spfgen.write_spf(matrixmarket_file_path, output_spf_file_path.as_str());
+        if output_spf_file_path.0 {
+            spfgen.write_spf(matrixmarket_file_path, output_spf_file_path.1.as_str());
+        }
+    }
 }

@@ -77,7 +77,6 @@ impl SpGSearxMatrix {
     }
 
     pub fn print_patterns(&self) {
-        println!("--- Patterns ---");
         println!("N\tI\tJ");
         self.patterns.iter().for_each(|&(i,j,k)| {
             println!("{}\t{}\t{}", i, j, k);
