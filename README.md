@@ -28,12 +28,6 @@ Optionally, to compile to the C equivalent of `-march=native` compilation must b
 RUSTFLAGS="-C target-cpu=native" cargo build --release
 ```
 
-### Enabling features
-This prototype implements two shortcuts that, depending on the characteristics of the matrix, may reduce search time drastically while producing identical or very similar results. The features are listed on the `Cargo.toml` file and can be activated at compile time as shown below
-```bash
-cargo build <other_flags> --features shortcut_on_invalidation,shortcut_on_pattern_search
-```
-
 ## Usage
 Debug and release builds are located inside the `target` folder, like below. Needless to say, release builds must be used if good speed is desired, as in this case tend to perform around 20 to 100 times faster.
 ```bash
@@ -42,6 +36,37 @@ Debug and release builds are located inside the `target` folder, like below. Nee
 
 # Release build can be executed with
 ./target/release/matrix_rs <flags>
+```
+
+### Command line options
+Help on command line options can be obtained by adding `--help` to the cmdline. A sample (and not necessarilly updated) help output is as below:
+```bash
+./target/release/matrix_rs --help
+ARGS:
+    <patterns_file_path>
+      File containing pattern list
+
+    <matrixmarket_file_path>
+      Input MatrixMarket file
+
+OPTIONS:
+    --print-pattern-list
+      Print patterns parsed from pattern list
+
+    --search-flags <search_flags>
+      [2D SEARCH] Search Flags. Valid options: {[PatternFirst], CellFirst} where [] = default.
+
+    -w, --write-spf <output_spf_file_path>
+      Write to custom SPF file. By default writes to matrix_market_file.mtx.spf
+
+    --print-ast-list
+      Print piece list (AST list)
+
+    --print-uwc-list
+      Print uwc lists
+
+    -h, --help
+      Prints help information.
 ```
 
 ### Example
@@ -54,11 +79,27 @@ cargo run -- ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
 ./target/release/matrix_rs.exe ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
 ```
 
+However, you will notice that these commands produce no output. Some frequent use cases can be:
+
+#### Printing AST list
+```bash
+./target/release/matrix_rs.exe ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx --print-ast-list
+```
+
+#### Writing to SPF file
+```bash
+./target/release/matrix_rs.exe ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf
+```
+
+#### Mixed usage
+Needless to say, flags can be combined unless explicitly said. For example, in order to obtain more information about the data transformation process, several flags can be specified at the same time.
+```bash
+./target/release/matrix_rs.exe ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf --print-ast-list --print-uwc-list --print-pattern-list
+```
+
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first
 to discuss what you would like to change.
-
-Major refactoring is incoming, so do not bother just yet :)
 
 ## License
 [TO BE DECIDED](https://www.youtube.com/watch?v=SEGLhUZRZdY)

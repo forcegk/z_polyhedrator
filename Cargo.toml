@@ -18,8 +18,3 @@ xflags = "0.3.1"
 
 [profile.release]
 opt-level = 3
-
-# No longer required
-# [features]
-# shortcut_on_invalidation = []
-# shortcut_on_pattern_search = []
