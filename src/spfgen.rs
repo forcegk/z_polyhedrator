@@ -119,11 +119,21 @@ impl SPFGen {
         //  (python code `f.seek ( 26 )` on write_spf func at around line 810)
         file.write_i32::<LittleEndian>(0i32).unwrap();
 
+        // This has been brought from down below, as it is useful for the following computation
+        // We also know that regular pieces are at the end of the list
+        let piece_cutoff = self.uwc_list.iter().filter(|(id,_)| id != ninc_nonzero_pattern_id).count();
+        // println!("Piece cutoff = {}", piece_cutoff);
+
+        let shape_dims_max: i16 = {
+            if piece_cutoff == 0 { 0i16 }
+            else { 1i16 }
+        };
+
         // Write maximum dimensionality of iP for vertex_rec (FIXME this currently only supports 1d)
-        file.write_i16::<LittleEndian>(1i16).unwrap();
+        file.write_i16::<LittleEndian>(shape_dims_max).unwrap();
 
         // FIXME Get shape_dims_max from previous it
-        for _ in 0..1 {
+        for _ in 0..shape_dims_max {
             file.write_i32::<LittleEndian>(0i32).unwrap();
         }
 
@@ -166,10 +176,6 @@ impl SPFGen {
             }
             // println!("c = {:?}", c);
         });
-
-        // We also know that regular pieces are at the end of the list
-        let piece_cutoff = self.uwc_list.iter().filter(|(id,_)| id != ninc_nonzero_pattern_id).count();
-        // println!("Piece cutoff = {}", piece_cutoff);
 
         // Write total number of origins
         file.write_i32::<LittleEndian>(piece_cutoff as i32).unwrap();
