@@ -58,6 +58,7 @@ import os
 import PyPDF2
 import argparse
 import tempfile
+import charset_normalizer
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -78,7 +79,8 @@ def read_ast_file(ast_file):
         raise FileNotFoundError(f'AST file `{ast_file}` does not exist')
 
     with open(ast_file, 'r') as f:
-        asts = [line.strip() for line in f.readlines()]
+        results = str(charset_normalizer.from_path(ast_file).best())
+        asts = [line.strip() for line in results.split('\n')]
     asts = [ast for ast in asts if ast != '']
 
     if not asts:
