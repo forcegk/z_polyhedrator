@@ -55,6 +55,7 @@ __author__ = 'Iñaki Amatria-Barral'
 __license__ = 'I addere to any license you want to use this code under'
 
 import os
+import tqdm
 import PyPDF2
 import argparse
 import tempfile
@@ -289,12 +290,9 @@ def print_asts_2d(asts, ast_file_name):
                 pbar.update()
 
 
-        # Four steps (this is mainlly for the user to not freak out if it takes some time)
-        with tqdm(total=int(4)) as pbar:
-            print("Compressing PDF...")
-            blank_page.compress_content_streams()
-            pbar.update()
-
+        # Three steps (this is mainlly for the user to not freak out if it takes some time)
+        print("Exporting PDF...")
+        with tqdm(total=int(3)) as pbar:
             if os.path.dirname(ast_file_name) != '':
                 os.makedirs(os.path.dirname(ast_file_name), exist_ok=True)
             pbar.update()
