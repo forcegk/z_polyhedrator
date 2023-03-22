@@ -25,10 +25,7 @@
 #
 # An AST file is generated using the following syntax:
 #
-# /path/to/matrix_rs \
-#     /path/to/patterns.txt \
-#     /path/to/matrix.mtx   \
-#     --print-ast-list > /path/to/ast_file.txt
+# matrix_rs patterns.txt matrix.mtx --print-ast-list > ast_file.txt
 #
 # where `matrix_rs` is the path to the matrix_rs executable, `patterns.txt` is
 # the path to the patterns file, `matrix.mtx` is the path to the matrix file and
@@ -36,7 +33,7 @@
 #
 # The script is then executed using the following syntax:
 #
-# python3 plot_ast_2d.py /path/to/ast_file.txt [-o /path/to/output.pdf]
+# python3 plot_ast_2d.py ast_file.txt [-o output.pdf]
 #
 # where `ast_file.txt` is the path to the AST file to be plotted and
 # `output.pdf` is the path to the output PDF file.
@@ -58,14 +55,17 @@ __author__ = 'Iñaki Amatria-Barral'
 __license__ = 'I addere to any license you want to use this code under'
 
 import os
+import tqdm
 import PyPDF2
 import argparse
 import tempfile
+import charset_normalizer
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 from concurrent.futures import ProcessPoolExecutor
+from tqdm import tqdm
 
 def _is_int(s):
     try:
@@ -81,7 +81,8 @@ def read_ast_file(ast_file):
         raise FileNotFoundError(f'AST file `{ast_file}` does not exist')
 
     with open(ast_file, 'r') as f:
-        asts = [line.strip() for line in f.readlines()]
+        results = str(charset_normalizer.from_path(ast_file).best())
+        asts = [line.strip() for line in results.split('\n')]
     asts = [ast for ast in asts if ast != '']
 
     if not asts:
@@ -143,7 +144,7 @@ def _plot_matrix_block(i, j, stride_i, stride_j, asts, tmp_dir):
                     color=ast_type_color[(n, ii, jj)],
                     marker='o'
                 )
-                ax.lines.append(
+                ax.add_line(
                     plt.Line2D(
                         (col + k * jj + 0.5, col + (k + 1) * jj + 0.5),
                         (row + k * ii + 0.5, row + (k + 1) * ii + 0.5),
@@ -222,25 +223,28 @@ def print_asts_2d(asts, ast_file_name):
     stride_j = 20
 
     with tempfile.TemporaryDirectory() as tmp_dir:
-        max_row = max([ast[1] + (ast[2] - 1) * ast[4] for ast in asts])
-        max_col = max([ast[0] + (ast[2] - 1) * ast[3] for ast in asts])
+        max_row_idx = max([ast[1] + (ast[2] - 1) * ast[4] for ast in asts])
+        max_col_idx = max([ast[0] + (ast[2] - 1) * ast[3] for ast in asts])
 
-        max_row = stride_i * int((max_row + stride_i) / stride_i)
-        max_col = stride_j * int((max_col + stride_j) / stride_j)
+        max_row = stride_i * int((max_row_idx + stride_i) / stride_i)
+        max_col = stride_j * int((max_col_idx + stride_j) / stride_j)
 
-        with ProcessPoolExecutor() as executor:
-            for i in range(0, max_row, stride_i):
-                for j in range(0, max_col, stride_j):
-                    executor.submit(
-                        _plot_matrix_block,
-                        i,
-                        j,
-                        stride_i,
-                        stride_j,
-                        asts,
-                        tmp_dir
-                    )
+        print("Plotting PDFs...")
+        with tqdm(total=int((max_row / stride_i) * (max_col / stride_j))) as pbar:
+            with ProcessPoolExecutor() as executor:
+                for i in range(0, max_row, stride_i):
+                    for j in range(0, max_col, stride_j):
+                        executor.submit(
+                            _plot_matrix_block,
+                            i,
+                            j,
+                            stride_i,
+                            stride_j,
+                            asts,
+                            tmp_dir
+                        ).add_done_callback(lambda _: pbar.update())
 
+        print("Merging PDFs...")
         load_path = os.path.join(tmp_dir, '0_0.pdf')
 
         pdf = PyPDF2.PdfReader(load_path)
@@ -249,47 +253,54 @@ def print_asts_2d(asts, ast_file_name):
         width = page.mediabox.width
         height = page.mediabox.height
         blank_page = PyPDF2.PageObject.create_blank_page(
-            width=width * int(max_row / stride_i),
-            height=height * int(max_col / stride_j)
+            width=int(width * (max_row_idx + 1) / stride_i),
+            height=int(height * (max_col_idx + 1) / stride_j)
         )
         target_width = blank_page.mediabox.width
         target_height = blank_page.mediabox.height
 
-        with ProcessPoolExecutor() as executor:
+        with tqdm(total=int(2*(max_col / stride_j))) as pbar:
+            with ProcessPoolExecutor() as executor:
+                for j in range(0, max_col, stride_j):
+                    executor.submit(
+                        _merge_matrix_block,
+                        j,
+                        stride_i,
+                        max_row,
+                        width,
+                        height,
+                        target_width,
+                        tmp_dir
+                    ).add_done_callback(lambda _: pbar.update())
+
             for j in range(0, max_col, stride_j):
-                executor.submit(
-                    _merge_matrix_block,
-                    j,
-                    stride_i,
-                    max_row,
-                    width,
-                    height,
-                    target_width,
-                    tmp_dir
+                pdf = PyPDF2.PdfReader(os.path.join(tmp_dir, f'row_{j}.pdf'))
+                page = pdf.pages[0]
+
+                x_offset = 0
+                y_offset = target_height - (int(j / stride_j) + 1) * height
+
+                page.add_transformation(
+                    PyPDF2.Transformation().translate(x_offset, y_offset)
                 )
 
-        for j in range(0, max_col, stride_j):
-            pdf = PyPDF2.PdfReader(os.path.join(tmp_dir, f'row_{j}.pdf'))
-            page = pdf.pages[0]
+                page.mediabox = blank_page.mediabox
+                blank_page.merge_page(page)
+                pbar.update()
 
-            x_offset = 0
-            y_offset = target_height - (int(j / stride_j) + 1) * height
 
-            page.add_transformation(
-                PyPDF2.Transformation().translate(x_offset, y_offset)
-            )
+        # Three steps (this is mainlly for the user to not freak out if it takes some time)
+        print("Exporting PDF...")
+        with tqdm(total=int(3)) as pbar:
+            if os.path.dirname(ast_file_name) != '':
+                os.makedirs(os.path.dirname(ast_file_name), exist_ok=True)
+            pbar.update()
 
-            page.mediabox = blank_page.mediabox
-            blank_page.merge_page(page)
-
-        blank_page.compress_content_streams()
-
-        if os.path.dirname(ast_file_name) != '':
-            os.makedirs(os.path.dirname(ast_file_name), exist_ok=True)
-
-        pdf_writer = PyPDF2.PdfWriter()
-        pdf_writer.add_page(blank_page)
-        pdf_writer.write(ast_file_name)
+            pdf_writer = PyPDF2.PdfWriter()
+            pdf_writer.add_page(blank_page)
+            pbar.update()
+            pdf_writer.write(ast_file_name)
+            pbar.update()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(

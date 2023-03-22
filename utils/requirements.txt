@@ -2,3 +2,5 @@ pypdf2
 numpy
 matplotlib
 scipy
+charset-normalizer
+tqdm
