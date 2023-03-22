@@ -60,7 +60,6 @@ import PyPDF2
 import argparse
 import tempfile
 import charset_normalizer
-from time import sleep
 
 import numpy as np
 import matplotlib.pyplot as plt
