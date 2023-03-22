@@ -55,7 +55,6 @@ __author__ = 'Iñaki Amatria-Barral'
 __license__ = 'I addere to any license you want to use this code under'
 
 import os
-import tqdm
 import PyPDF2
 import argparse
 import tempfile
@@ -64,8 +63,9 @@ import charset_normalizer
 import numpy as np
 import matplotlib.pyplot as plt
 
-from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
+
+from concurrent.futures import ProcessPoolExecutor
 
 def _is_int(s):
     try:
@@ -97,6 +97,18 @@ def read_ast_file(ast_file):
 
     return [[int(x) for x in ast.split('\t')] for ast in asts]
 
+def _is_in_matrix_block(i, j, stride_i, stride_j, ast):
+    row, col, n, ii, jj = ast
+
+    for k in range(n):
+        if row + k * ii < j or row + k * ii >= j + stride_j:
+            continue
+        if col + k * jj < i or col + k * jj >= i + stride_i:
+            continue
+        return True
+
+    return False
+
 def _plot_matrix_block(i, j, stride_i, stride_j, asts, tmp_dir):
     colors = plt.cm.nipy_spectral(np.linspace(0, 1, len(asts)))
     ast_type_color = {(n, i, j): 0 for _, _, n, i, j in asts}
@@ -107,14 +119,11 @@ def _plot_matrix_block(i, j, stride_i, stride_j, asts, tmp_dir):
 
     points_in_canvas = 0
     for ast in asts:
-        row, col, n, ii, jj = ast
-
-        if row + (n - 1) * ii < j or row > j + stride_j:
-            continue
-        if col + (n - 1) * jj < i or col > i + stride_i:
+        if not _is_in_matrix_block(i, j, stride_i, stride_j, ast):
             continue
         points_in_canvas += 1
 
+        row, col, n, ii, jj = ast
         for k in range(n):
             ax.add_patch(
                 plt.Polygon(
@@ -230,7 +239,8 @@ def print_asts_2d(asts, ast_file_name):
         max_col = stride_j * int((max_col_idx + stride_j) / stride_j)
 
         print("Plotting PDFs...")
-        with tqdm(total=int((max_row / stride_i) * (max_col / stride_j))) as pbar:
+        total_pdfs = int((max_row / stride_i) * (max_col / stride_j))
+        with tqdm(total=total_pdfs) as pbar:
             with ProcessPoolExecutor() as executor:
                 for i in range(0, max_row, stride_i):
                     for j in range(0, max_col, stride_j):
@@ -244,7 +254,6 @@ def print_asts_2d(asts, ast_file_name):
                             tmp_dir
                         ).add_done_callback(lambda _: pbar.update())
 
-        print("Merging PDFs...")
         load_path = os.path.join(tmp_dir, '0_0.pdf')
 
         pdf = PyPDF2.PdfReader(load_path)
@@ -259,7 +268,9 @@ def print_asts_2d(asts, ast_file_name):
         target_width = blank_page.mediabox.width
         target_height = blank_page.mediabox.height
 
-        with tqdm(total=int(2*(max_col / stride_j))) as pbar:
+        print("Merging PDFs...")
+        total_merges = int(2 * (max_col / stride_j))
+        with tqdm(total=total_merges) as pbar:
             with ProcessPoolExecutor() as executor:
                 for j in range(0, max_col, stride_j):
                     executor.submit(
@@ -288,8 +299,8 @@ def print_asts_2d(asts, ast_file_name):
                 blank_page.merge_page(page)
                 pbar.update()
 
-
-        # Three steps (this is mainlly for the user to not freak out if it takes some time)
+        # Three steps (this is mainly for the user to not freak out if it takes
+        # some time)
         print("Exporting PDF...")
         with tqdm(total=int(3)) as pbar:
             if os.path.dirname(ast_file_name) != '':
