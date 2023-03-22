@@ -25,10 +25,7 @@
 #
 # An AST file is generated using the following syntax:
 #
-# /path/to/matrix_rs \
-#     /path/to/patterns.txt \
-#     /path/to/matrix.mtx   \
-#     --print-ast-list > /path/to/ast_file.txt
+# matrix_rs patterns.txt matrix.mtx --print-ast-list > ast_file.txt
 #
 # where `matrix_rs` is the path to the matrix_rs executable, `patterns.txt` is
 # the path to the patterns file, `matrix.mtx` is the path to the matrix file and
@@ -36,7 +33,7 @@
 #
 # The script is then executed using the following syntax:
 #
-# python3 plot_ast_2d.py /path/to/ast_file.txt [-o /path/to/output.pdf]
+# python3 plot_ast_2d.py ast_file.txt [-o output.pdf]
 #
 # where `ast_file.txt` is the path to the AST file to be plotted and
 # `output.pdf` is the path to the output PDF file.
@@ -222,11 +219,11 @@ def print_asts_2d(asts, ast_file_name):
     stride_j = 20
 
     with tempfile.TemporaryDirectory() as tmp_dir:
-        max_row = max([ast[1] + (ast[2] - 1) * ast[4] for ast in asts])
-        max_col = max([ast[0] + (ast[2] - 1) * ast[3] for ast in asts])
+        max_row_idx = max([ast[1] + (ast[2] - 1) * ast[4] for ast in asts])
+        max_col_idx = max([ast[0] + (ast[2] - 1) * ast[3] for ast in asts])
 
-        max_row = stride_i * int((max_row + stride_i) / stride_i)
-        max_col = stride_j * int((max_col + stride_j) / stride_j)
+        max_row = stride_i * int((max_row_idx + stride_i) / stride_i)
+        max_col = stride_j * int((max_col_idx + stride_j) / stride_j)
 
         with ProcessPoolExecutor() as executor:
             for i in range(0, max_row, stride_i):
@@ -249,8 +246,8 @@ def print_asts_2d(asts, ast_file_name):
         width = page.mediabox.width
         height = page.mediabox.height
         blank_page = PyPDF2.PageObject.create_blank_page(
-            width=width * int(max_row / stride_i),
-            height=height * int(max_col / stride_j)
+            width=int(width * (max_row_idx + 1) / stride_i),
+            height=int(height * (max_col_idx + 1) / stride_j)
         )
         target_width = blank_page.mediabox.width
         target_height = blank_page.mediabox.height
