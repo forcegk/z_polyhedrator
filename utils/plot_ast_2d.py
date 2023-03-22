@@ -140,7 +140,7 @@ def _plot_matrix_block(i, j, stride_i, stride_j, asts, tmp_dir):
                     color=ast_type_color[(n, ii, jj)],
                     marker='o'
                 )
-                ax.lines.append(
+                ax.add_line(
                     plt.Line2D(
                         (col + k * jj + 0.5, col + (k + 1) * jj + 0.5),
                         (row + k * ii + 0.5, row + (k + 1) * ii + 0.5),
