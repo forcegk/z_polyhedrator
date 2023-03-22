@@ -55,6 +55,7 @@ __author__ = 'Iñaki Amatria-Barral'
 __license__ = 'I addere to any license you want to use this code under'
 
 import os
+import tqdm
 import PyPDF2
 import argparse
 import tempfile
@@ -227,18 +228,21 @@ def print_asts_2d(asts, ast_file_name):
         max_row = stride_i * int((max_row_idx + stride_i) / stride_i)
         max_col = stride_j * int((max_col_idx + stride_j) / stride_j)
 
-        with ProcessPoolExecutor() as executor:
-            for i in range(0, max_row, stride_i):
-                for j in range(0, max_col, stride_j):
-                    executor.submit(
-                        _plot_matrix_block,
-                        i,
-                        j,
-                        stride_i,
-                        stride_j,
-                        asts,
-                        tmp_dir
-                    )
+        print('Plotting matrix blocks...')
+        total_blocks = int(np.ceil(max_row * max_col / stride_i / stride_j))
+        with tqdm.tqdm(total=total_blocks) as pbar:
+            with ProcessPoolExecutor() as executor:
+                for i in range(0, max_row, stride_i):
+                    for j in range(0, max_col, stride_j):
+                        executor.submit(
+                            _plot_matrix_block,
+                            i,
+                            j,
+                            stride_i,
+                            stride_j,
+                            asts,
+                            tmp_dir
+                        ).add_done_callback(lambda _: pbar.update())
 
         load_path = os.path.join(tmp_dir, '0_0.pdf')
 
@@ -254,34 +258,39 @@ def print_asts_2d(asts, ast_file_name):
         target_width = blank_page.mediabox.width
         target_height = blank_page.mediabox.height
 
-        with ProcessPoolExecutor() as executor:
+        print('Merging matrix blocks into rows...')
+        total_rows = int(np.ceil(max_col / stride_j))
+        with tqdm.tqdm(total=total_rows) as pbar:
+            with ProcessPoolExecutor() as executor:
+                for j in range(0, max_col, stride_j):
+                    executor.submit(
+                        _merge_matrix_block,
+                        j,
+                        stride_i,
+                        max_row,
+                        width,
+                        height,
+                        target_width,
+                        tmp_dir
+                    ).add_done_callback(lambda _: pbar.update())
+
+        print('Merging rows...')
+        with tqdm.tqdm(total=total_rows) as pbar:
             for j in range(0, max_col, stride_j):
-                executor.submit(
-                    _merge_matrix_block,
-                    j,
-                    stride_i,
-                    max_row,
-                    width,
-                    height,
-                    target_width,
-                    tmp_dir
+                pdf = PyPDF2.PdfReader(os.path.join(tmp_dir, f'row_{j}.pdf'))
+                page = pdf.pages[0]
+
+                x_offset = 0
+                y_offset = target_height - (int(j / stride_j) + 1) * height
+
+                page.add_transformation(
+                    PyPDF2.Transformation().translate(x_offset, y_offset)
                 )
 
-        for j in range(0, max_col, stride_j):
-            pdf = PyPDF2.PdfReader(os.path.join(tmp_dir, f'row_{j}.pdf'))
-            page = pdf.pages[0]
+                page.mediabox = blank_page.mediabox
+                blank_page.merge_page(page)
 
-            x_offset = 0
-            y_offset = target_height - (int(j / stride_j) + 1) * height
-
-            page.add_transformation(
-                PyPDF2.Transformation().translate(x_offset, y_offset)
-            )
-
-            page.mediabox = blank_page.mediabox
-            blank_page.merge_page(page)
-
-        blank_page.compress_content_streams()
+                pbar.update()
 
         if os.path.dirname(ast_file_name) != '':
             os.makedirs(os.path.dirname(ast_file_name), exist_ok=True)
