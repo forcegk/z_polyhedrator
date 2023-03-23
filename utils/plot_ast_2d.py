@@ -211,25 +211,103 @@ def _merge_matrix_block(
             continue
 
         pdf = PyPDF2.PdfReader(load_path)
-        page = pdf.pages[0]
 
         x_offset = int(i / stride_i) * width
         y_offset = 0
 
+        page = pdf.pages[0]
         page.add_transformation(
             PyPDF2.Transformation().translate(x_offset, y_offset)
         )
-
         page.mediabox = blank_row.mediabox
+
         blank_row.merge_page(page)
 
     pdf_writer = PyPDF2.PdfWriter()
     pdf_writer.add_page(blank_row)
     pdf_writer.write(os.path.join(tmp_dir, f'row_{j}.pdf'))
 
+def _log_reduction(
+        k,
+        reductions,
+        j,
+        stride_j,
+        height,
+        target_width,
+        target_height,
+        tmp_dir,
+        ast_file_name
+    ):
+    top_idx, bot_idx = j, j + (2 ** k) * stride_j
+
+    merge_path = os.path.join(tmp_dir, f'row_{k - 1}_')
+    if k == 0:
+        merge_path = os.path.join(tmp_dir, f'row_')
+
+    top_path = merge_path + f'{top_idx}.pdf'
+    bot_path = merge_path + f'{bot_idx}.pdf'
+
+    target_page = PyPDF2.PageObject.create_blank_page(
+        width=target_width,
+        height=height * 2 * (2 ** k)
+    )
+
+    if os.path.exists(top_path):
+        top_row = PyPDF2.PdfReader(top_path)
+
+        top_page = top_row.pages[0]
+        top_page.add_transformation(
+            PyPDF2.Transformation().translate(0, height * (2 ** k))
+        )
+        top_page.mediabox = target_page.mediabox
+
+        target_page.merge_page(top_page)
+
+    if os.path.exists(bot_path):
+        bot_row = PyPDF2.PdfReader(bot_path)
+
+        bot_page = bot_row.pages[0]
+        bot_page.add_transformation(
+            PyPDF2.Transformation().translate(0, 0)
+        )
+        bot_page.mediabox = target_page.mediabox
+
+        target_page.merge_page(bot_page)
+
+    if k != reductions - 1:
+        pdf_writer = PyPDF2.PdfWriter()
+        pdf_writer.add_page(target_page)
+        pdf_writer.write(os.path.join(tmp_dir, f'row_{k}_{j}.pdf'))
+        return
+
+    blank_page = PyPDF2.PageObject.create_blank_page(
+        width=target_width,
+        height=target_height
+    )
+
+    target_page.add_transformation(
+        PyPDF2.Transformation().translate(
+            0,
+            target_height - target_page.mediabox.height
+        )
+    )
+    target_page.mediabox = blank_page.mediabox
+
+    blank_page.merge_page(target_page)
+
+    if os.path.dirname(ast_file_name) != '':
+        os.makedirs(
+            os.path.dirname(ast_file_name),
+            exist_ok=True
+        )
+
+    pdf_writer = PyPDF2.PdfWriter()
+    pdf_writer.add_page(blank_page)
+    pdf_writer.write(ast_file_name)
+
 def print_asts_2d(asts, ast_file_name):
-    stride_i = 20
-    stride_j = 20
+    stride_i = 25
+    stride_j = 25
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         max_row_idx = max([ast[1] + (ast[2] - 1) * ast[4] for ast in asts])
@@ -261,16 +339,13 @@ def print_asts_2d(asts, ast_file_name):
 
         width = page.mediabox.width
         height = page.mediabox.height
-        blank_page = PyPDF2.PageObject.create_blank_page(
-            width=int(width * (max_row_idx + 1) / stride_i),
-            height=int(height * (max_col_idx + 1) / stride_j)
-        )
-        target_width = blank_page.mediabox.width
-        target_height = blank_page.mediabox.height
+        target_width = int(width * (max_row_idx + 1) / stride_i)
+        target_height = int(height * (max_col_idx + 1) / stride_j)
 
         print("Merging PDFs...")
-        total_merges = int(2 * (max_col / stride_j))
-        with tqdm(total=total_merges) as pbar:
+        merges = int(max_col / stride_j)
+        reductions = int(np.log2(max_col / stride_j)) + 1
+        with tqdm(total=merges + reductions) as pbar:
             with ProcessPoolExecutor() as executor:
                 for j in range(0, max_col, stride_j):
                     executor.submit(
@@ -284,34 +359,28 @@ def print_asts_2d(asts, ast_file_name):
                         tmp_dir
                     ).add_done_callback(lambda _: pbar.update())
 
-            for j in range(0, max_col, stride_j):
-                pdf = PyPDF2.PdfReader(os.path.join(tmp_dir, f'row_{j}.pdf'))
-                page = pdf.pages[0]
+            with ProcessPoolExecutor() as executor:
+                for k in range(0, reductions):
+                    futures = []
+                    for j in range(0, max_col, stride_j * (2 ** (k + 1))):
+                        future = executor.submit(
+                            _log_reduction,
+                            k,
+                            reductions,
+                            j,
+                            stride_j,
+                            height,
+                            target_width,
+                            target_height,
+                            tmp_dir,
+                            ast_file_name
+                        )
+                        futures.append(future)
 
-                x_offset = 0
-                y_offset = target_height - (int(j / stride_j) + 1) * height
+                    for future in futures:
+                        future.result()
 
-                page.add_transformation(
-                    PyPDF2.Transformation().translate(x_offset, y_offset)
-                )
-
-                page.mediabox = blank_page.mediabox
-                blank_page.merge_page(page)
-                pbar.update()
-
-        # Three steps (this is mainly for the user to not freak out if it takes
-        # some time)
-        print("Exporting PDF...")
-        with tqdm(total=int(3)) as pbar:
-            if os.path.dirname(ast_file_name) != '':
-                os.makedirs(os.path.dirname(ast_file_name), exist_ok=True)
-            pbar.update()
-
-            pdf_writer = PyPDF2.PdfWriter()
-            pdf_writer.add_page(blank_page)
-            pbar.update()
-            pdf_writer.write(ast_file_name)
-            pbar.update()
+                    pbar.update()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
