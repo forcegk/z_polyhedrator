@@ -134,7 +134,8 @@ def _plot_matrix_block(i, j, stride_i, stride_j, asts, tmp_dir):
                         (col + k * jj, row + k * ii + 1),
                     ],
                     facecolor=ast_type_color[(n, ii, jj)],
-                    alpha=0.5
+                    alpha=0.5,
+                    zorder=0
                 )
             )
         for k in range(n):
@@ -144,22 +145,23 @@ def _plot_matrix_block(i, j, stride_i, stride_j, asts, tmp_dir):
                 col + k * jj + 0.5,
                 row + k * ii + 0.5,
                 color=ast_type_color[(n, ii, jj)],
-                marker='o'
+                marker='o',
+                zorder=2
             )
             if n > 1:
                 ax.scatter(
                     col + (k + 1) * jj + 0.5,
                     row + (k + 1) * ii + 0.5,
                     color=ast_type_color[(n, ii, jj)],
-                    marker='o'
+                    marker='o',
+                    zorder=2
                 )
-                ax.add_line(
-                    plt.Line2D(
-                        (col + k * jj + 0.5, col + (k + 1) * jj + 0.5),
-                        (row + k * ii + 0.5, row + (k + 1) * ii + 0.5),
-                        color=ast_type_color[(n, ii, jj)],
-                        linestyle='-'
-                    )
+                ax.plot(
+                    (col + k * jj + 0.5, col + (k + 1) * jj + 0.5),
+                    (row + k * ii + 0.5, row + (k + 1) * ii + 0.5),
+                    color=ast_type_color[(n, ii, jj)],
+                    linestyle='-',
+                    zorder=1
                 )
 
     if points_in_canvas == 0 and not (i == 0 and j == 0):
