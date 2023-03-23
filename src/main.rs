@@ -36,6 +36,9 @@ fn main() {
 
         /// Print uwc lists
         optional --print-uwc-list
+
+        /// Augment dimensionality
+        optional -a, --augment-dimensionality augment_dimensionality: usize
     };
 
     let patterns_file_path = flags.patterns_file_path.to_str().unwrap();
@@ -86,6 +89,18 @@ fn main() {
 
     if flags.print_ast_list {
         base_matrix.print_pieces();
+    }
+
+    let augment_dimensionality: usize = {
+        if flags.augment_dimensionality.is_some() {
+            flags.augment_dimensionality.unwrap()
+        } else {
+            1usize
+        }
+    };
+
+    if augment_dimensionality > 1 {
+        // Augment dimensionality
     }
 
     if flags.print_uwc_list || output_spf_file_path.0 {
