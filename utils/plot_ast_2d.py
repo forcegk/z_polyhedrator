@@ -47,7 +47,7 @@
 # The script will create a temporary directory in your system's temporary
 # directory. This directory will be deleted when the script finishes.
 
-__version__ = 'v0.0.0'
+__version__ = 'v0.0.1'
 
 __email__ = 'i.amatria@udc.es'
 __author__ = 'Iñaki Amatria-Barral'
@@ -55,10 +55,14 @@ __author__ = 'Iñaki Amatria-Barral'
 __license__ = 'I addere to any license you want to use this code under'
 
 import os
+import shutil
 import PyPDF2
 import argparse
 import tempfile
+import matplotlib
 import charset_normalizer
+
+matplotlib.use('Agg')
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -67,328 +71,348 @@ from tqdm import tqdm
 
 from concurrent.futures import ProcessPoolExecutor
 
-def _is_int(s):
-    try:
-        int(s)
-        return True
-    except ValueError:
+class AST:
+    def __init__(self, row, col, n, i, j):
+        self._row = row
+        self._col = col
+        self._n = n
+        self._i = i
+        self._j = j
+
+    def max_row(self):
+        return self._row + (self._n - 1) * self._i
+
+    def max_col(self):
+        return self._col + (self._n - 1) * self._j
+
+    def is_in_block(self, min_x, max_x, min_y, max_y):
+        for k in range(self._n):
+            x = self._col + k * self._j
+            y = self._row + k * self._i
+            if x >= min_x and x < max_x and y >= min_y and y < max_y:
+                return True
+        for k in range(self._n - 1):
+            start_x = self._col + k * self._j
+            start_y = self._row + k * self._i
+            end_x = self._col + (k + 1) * self._j
+            end_y = self._row + (k + 1) * self._i
+
+            if start_x > end_x:
+                start_x, end_x = end_x, start_x
+            if start_y > end_y:
+                start_y, end_y = end_y, start_y
+
+            for x in range(start_x, end_x + 1):
+                for y in range(start_y, end_y + 1):
+                    if x >= min_x and x < max_x and y >= min_y and y < max_y:
+                        return True
         return False
 
-def read_ast_file(ast_file):
-    ast_magic_header = 'Row\tCol\tN\tI\tJ'
-
-    if not os.path.exists(ast_file):
-        raise FileNotFoundError(f'AST file `{ast_file}` does not exist')
-
-    with open(ast_file, 'r') as f:
-        results = str(charset_normalizer.from_path(ast_file).best())
-        asts = [line.strip() for line in results.split('\n')]
-    asts = [ast for ast in asts if ast != '']
-
-    if not asts:
-        raise ValueError(f'AST file `{ast_file}` is empty')
-    if asts[0] != ast_magic_header:
-        raise ValueError(f'AST file `{ast_file}` is not a valid AST file')
-    asts = asts[1:]
-    for ast in asts:
-        ast = ast.split('\t')
-        if len(ast) != 5 or any([not _is_int(ast[i]) for i in range(5)]):
-            raise ValueError(f'AST file `{ast_file}` is not a valid AST file')
-
-    return [[int(x) for x in ast.split('\t')] for ast in asts]
-
-def _is_in_matrix_block(i, j, stride_i, stride_j, ast):
-    row, col, n, ii, jj = ast
-
-    for k in range(n):
-        if row + k * ii < j or row + k * ii >= j + stride_j:
-            continue
-        if col + k * jj < i or col + k * jj >= i + stride_i:
-            continue
-        return True
-
-    return False
-
-def _plot_matrix_block(i, j, stride_i, stride_j, asts, tmp_dir):
-    colors = plt.cm.nipy_spectral(np.linspace(0, 1, len(asts)))
-    ast_type_color = {(n, i, j): 0 for _, _, n, i, j in asts}
-    ast_type_color = {k: colors[i] for i, k in enumerate(ast_type_color.keys())}
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-
-    points_in_canvas = 0
-    for ast in asts:
-        if not _is_in_matrix_block(i, j, stride_i, stride_j, ast):
-            continue
-        points_in_canvas += 1
-
-        row, col, n, ii, jj = ast
-        for k in range(n):
+    def plot(self, color, ax):
+        for k in range(self._n):
+            surface = [
+                (self._col + k * self._j, self._row + k * self._i),
+                (self._col + k * self._j + 1, self._row + k * self._i),
+                (self._col + k * self._j + 1, self._row + k * self._i + 1),
+                (self._col + k * self._j, self._row + k * self._i + 1)
+            ]
             ax.add_patch(
-                plt.Polygon(
-                    [
-                        (col + k * jj, row + k * ii),
-                        (col + k * jj + 1, row + k * ii),
-                        (col + k * jj + 1, row + k * ii + 1),
-                        (col + k * jj, row + k * ii + 1),
-                    ],
-                    facecolor=ast_type_color[(n, ii, jj)],
-                    alpha=0.5,
-                    zorder=0
-                )
+                plt.Polygon(surface, facecolor=color, alpha=0.5, zorder=0)
             )
-        for k in range(n):
-            if k == n - 1 and n > 1:
-                break
+
+        ax.scatter(self._col + 0.5, self._row + 0.5, color=color, zorder=2)
+        for k in range(1, self._n):
             ax.scatter(
-                col + k * jj + 0.5,
-                row + k * ii + 0.5,
-                color=ast_type_color[(n, ii, jj)],
-                marker='o',
+                self._col + k * self._j + 0.5,
+                self._row + k * self._i + 0.5,
+                color=color,
                 zorder=2
             )
-            if n > 1:
-                ax.scatter(
-                    col + (k + 1) * jj + 0.5,
-                    row + (k + 1) * ii + 0.5,
-                    color=ast_type_color[(n, ii, jj)],
-                    marker='o',
-                    zorder=2
-                )
-                ax.plot(
-                    (col + k * jj + 0.5, col + (k + 1) * jj + 0.5),
-                    (row + k * ii + 0.5, row + (k + 1) * ii + 0.5),
-                    color=ast_type_color[(n, ii, jj)],
-                    linestyle='-',
-                    zorder=1
-                )
 
-    if points_in_canvas == 0 and not (i == 0 and j == 0):
+        for k in range(self._n - 1):
+            ax.plot(
+                (
+                    self._col + k * self._j + 0.5,
+                    self._col + (k + 1) * self._j + 0.5
+                ),
+                (
+                    self._row + k * self._i + 0.5,
+                    self._row + (k + 1) * self._i + 0.5
+                ),
+                color=color,
+                zorder=1
+            )
+
+class ASTReader:
+    AST_MAGIC_HEADER = 'Row\tCol\tN\tI\tJ'
+
+    def __init__(self, ast_file):
+        self._ast_file = ast_file
+
+    def read(self):
+        if not os.path.isfile(self._ast_file):
+            raise FileNotFoundError(f'AST file {self._ast_file} does not exist')
+
+        results = str(charset_normalizer.from_path(self._ast_file).best())
+        raw_asts = [line.strip() for line in results.split('\n')]
+        raw_asts = [line for line in raw_asts if line != '']
+
+        if len(raw_asts) == 0:
+            raise ValueError(f'AST file {self._ast_file} is empty')
+
+        if raw_asts[0] != ASTReader.AST_MAGIC_HEADER:
+            raise ValueError(
+                f'AST file {self._ast_file} does not have a valid header'
+            )
+        raw_asts = raw_asts[1:]
+
+        asts = []
+        for raw_ast in raw_asts:
+            tmp_raw_ast = raw_ast.split('\t')
+
+            if len(tmp_raw_ast) != 5:
+                raise ValueError(f'`{raw_ast}` is not a valid AST')
+            if any(not self._is_int(value) for value in tmp_raw_ast):
+                raise ValueError(f'`{raw_ast}` is not a valid AST')
+
+            row, col, n, i, j = [int(value) for value in tmp_raw_ast]
+            asts.append(AST(row, col, n, i, j))
+
+        return asts
+
+    def _is_int(self, value):
+        try:
+            int(value)
+            return True
+        except ValueError:
+            return False
+
+class ASTPlotter:
+    STRIDE_X = 25
+    STRIDE_Y = 25
+
+    def __init__(self, asts, output_file):
+        self._asts = asts
+        self._output_file = output_file
+
+        self._max_x_idx = max(ast.max_col() for ast in self._asts)
+        self._max_y_idx = max(ast.max_row() for ast in self._asts)
+
+        self._max_x = ASTPlotter.STRIDE_X * int(
+            (self._max_x_idx + ASTPlotter.STRIDE_X) / ASTPlotter.STRIDE_X
+        )
+        self._max_y = ASTPlotter.STRIDE_Y * int(
+            (self._max_y_idx + ASTPlotter.STRIDE_Y) / ASTPlotter.STRIDE_Y
+        )
+
+    def plot(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self._plot_blocks(tmp_dir)
+            self._merge_blocks_into_rows(tmp_dir)
+            self._merge_rows_into_final_image(tmp_dir)
+
+            if os.path.dirname(self._output_file) != '':
+                os.makedirs(os.path.dirname(self._output_file), exist_ok=True)
+            shutil.move(os.path.join(tmp_dir, 'ast.pdf'), self._output_file)
+
+    def _plot_blocks(self, tmp_dir):
+        total_x = int(self._max_x / ASTPlotter.STRIDE_X)
+        total_y = int(self._max_y / ASTPlotter.STRIDE_Y)
+
+        description = 'Plotting PDFs'
+        progress_bar = tqdm(total=total_x * total_y, desc=description)
+        with ProcessPoolExecutor() as ex:
+            for x in range(0, self._max_x, ASTPlotter.STRIDE_X):
+                for y in range(0, self._max_y, ASTPlotter.STRIDE_Y):
+                    save_path = os.path.join(tmp_dir, f'block_{x}_{y}.pdf')
+                    ex.submit(
+                        self._plot_block,
+                        x,
+                        y,
+                        save_path
+                    ).add_done_callback(lambda _: progress_bar.update())
+        progress_bar.close()
+
+    def _merge_blocks_into_rows(self, tmp_dir):
+        total_merges = int(self._max_y / ASTPlotter.STRIDE_Y)
+
+        description = 'Merging PDFs'
+        progress_bar = tqdm(total=total_merges, desc=description)
+        with ProcessPoolExecutor() as ex:
+            for y in range(0, self._max_y, ASTPlotter.STRIDE_Y):
+                save_path = os.path.join(tmp_dir, f'row_{y}.pdf')
+                ex.submit(
+                    self._merge_blocks_into_row,
+                    y,
+                    tmp_dir,
+                    save_path
+                ).add_done_callback(lambda _: progress_bar.update())
+        progress_bar.close()
+
+    def _merge_rows_into_final_image(self, tmp_dir):
+        total_reductions = int(np.log2(self._max_y / ASTPlotter.STRIDE_Y)) + 1
+
+        description = 'Building final PDF'
+        progress_bar = tqdm(total=total_reductions, desc=description)
+        with ProcessPoolExecutor() as ex:
+            for k in range(total_reductions):
+                stride = ASTPlotter.STRIDE_Y * (2 ** (k + 1))
+                futures = [
+                    ex.submit(self._merge_rows_into_row, k, j, tmp_dir)
+                    for j in range(0, self._max_y, stride)
+                ]
+                _ = [future.result() for future in futures]
+                progress_bar.update()
+        progress_bar.close()
+
+    def _plot_block(self, x, y, save_path):
+        colors = plt.cm.nipy_spectral(np.linspace(0, 1, len(self._asts)))
+        ast_color= {
+            (ast._n, ast._i, ast._j): color
+            for ast, color in zip(self._asts, colors)
+        }
+
+        max_x = x + ASTPlotter.STRIDE_X
+        max_y = y + ASTPlotter.STRIDE_Y
+        asts = [
+            ast for ast in self._asts
+            if ast.is_in_block(x, max_x, y, max_y)
+        ]
+
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+
+        for ast in asts:
+            ast.plot(ast_color[(ast._n, ast._i, ast._j)], ax)
+
+        if len(asts) == 0 and not (x == 0 and y == 0):
+            plt.close()
+            return
+
+        plt.gca().set_axis_off()
+        plt.subplots_adjust(
+            top=1,
+            bottom=0,
+            right=1,
+            left=0,
+            hspace=0,
+            wspace=0
+        )
+        plt.margins(0, 0)
+
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        ax.set_xlim(x, max_x)
+        ax.set_ylim(y, max_y)
+
+        ax.invert_yaxis()
+
+        ax.set_aspect('equal')
+
+        plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
         plt.close()
-        return
 
-    plt.gca().set_axis_off()
-    plt.subplots_adjust(
-        top=1,
-        bottom=0,
-        right=1,
-        left=0,
-        hspace=0,
-        wspace=0
-    )
-    plt.margins(0, 0)
+    def _merge_blocks_into_row(self, y, tmp_dir, save_path):
+        reference_block = os.path.join(tmp_dir, f'block_0_0.pdf')
+        width, height = self._get_block_dimensions(reference_block)
 
-    ax.set_xticks([])
-    ax.set_yticks([])
+        row = PyPDF2.PageObject.create_blank_page(
+            width=width * (self._max_x_idx + 1) / ASTPlotter.STRIDE_X,
+            height=height
+        )
 
-    ax.set_aspect('equal')
+        for x in range(0, self._max_x, ASTPlotter.STRIDE_X):
+            block = os.path.join(tmp_dir, f'block_{x}_{y}.pdf')
+            if not os.path.isfile(block):
+                continue
 
-    ax.set_xlim([i, i + stride_i])
-    ax.set_ylim([j, j + stride_j])
-    ax.invert_yaxis()
+            pdf = PyPDF2.PdfReader(block)
+            page = pdf.pages[0]
 
-    save_path = os.path.join(tmp_dir, f'{i}_{j}.pdf')
-    plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
+            page.add_transformation(
+                PyPDF2.Transformation().translate(
+                    int(x / ASTPlotter.STRIDE_X) * width, 0
+                )
+            )
+            page.mediabox = row.mediabox
 
-    plt.close()
+            row.merge_page(page)
 
-def _merge_matrix_block(
-        j,
-        stride_i,
-        max_row,
-        width,
-        height,
-        target_width,
-        tmp_dir
-    ):
-    blank_row = PyPDF2.PageObject.create_blank_page(
-        width=target_width,
-        height=height
-    )
+        pdf = PyPDF2.PdfWriter()
+        pdf.add_page(row)
+        pdf.write(save_path)
 
-    for i in range(0, max_row, stride_i):
-        load_path = os.path.join(tmp_dir, f'{i}_{j}.pdf')
-        if not os.path.exists(load_path):
-            continue
+    def _merge_rows_into_row(self, k, j, tmp_dir):
+        reference_block = os.path.join(tmp_dir, f'block_0_0.pdf')
+        width, height = self._get_block_dimensions(reference_block)
 
-        pdf = PyPDF2.PdfReader(load_path)
+        total_reductions = int(np.log2(self._max_y / ASTPlotter.STRIDE_Y)) + 1
 
-        x_offset = int(i / stride_i) * width
-        y_offset = 0
+        top_row_idx, bottom_row_idx = j, j + (2 ** k) * ASTPlotter.STRIDE_Y
 
+        top_file = os.path.join(tmp_dir, f'row_{k - 1}_')
+        bottom_file = os.path.join(tmp_dir, f'row_{k - 1}_')
+        if k == 0:
+            top_file = os.path.join(tmp_dir, f'row_')
+            bottom_file = os.path.join(tmp_dir, f'row_')
+        top_file = f'{top_file}{top_row_idx}.pdf'
+        bottom_file = f'{bottom_file}{bottom_row_idx}.pdf'
+
+        row = PyPDF2.PageObject.create_blank_page(
+            width=width * (self._max_x_idx + 1) / ASTPlotter.STRIDE_X,
+            height=height * 2 * (2 ** k)
+        )
+
+        if os.path.isfile(top_file):
+            pdf = PyPDF2.PdfReader(top_file)
+            page = pdf.pages[0]
+
+            page.add_transformation(
+                PyPDF2.Transformation().translate(0, height * (2 ** k))
+            )
+            page.mediabox = row.mediabox
+
+            row.merge_page(page)
+        if os.path.isfile(bottom_file):
+            pdf = PyPDF2.PdfReader(bottom_file)
+            page = pdf.pages[0]
+
+            page.add_transformation(
+                PyPDF2.Transformation().translate(0, 0)
+            )
+            page.mediabox = row.mediabox
+
+            row.merge_page(page)
+
+        save_path = os.path.join(tmp_dir, f'row_{k}_{j}.pdf')
+        if k == total_reductions - 1:
+            save_path = os.path.join(tmp_dir, f'ast.pdf')
+
+            row.mediabox.lower_left = (
+                row.mediabox.lower_left[0],
+                row.mediabox.upper_left[1]
+                    - height * (self._max_y_idx + 1) / ASTPlotter.STRIDE_Y
+            )
+            row.mediabox.lower_right = (
+                row.mediabox.lower_right[0],
+                row.mediabox.upper_right[1]
+                    - height * (self._max_y_idx + 1) / ASTPlotter.STRIDE_Y
+            )
+
+        pdf = PyPDF2.PdfWriter()
+        pdf.add_page(row)
+        pdf.write(save_path)
+
+    def _get_block_dimensions(self, block):
+        pdf = PyPDF2.PdfReader(block)
         page = pdf.pages[0]
-        page.add_transformation(
-            PyPDF2.Transformation().translate(x_offset, y_offset)
-        )
-        page.mediabox = blank_row.mediabox
-
-        blank_row.merge_page(page)
-
-    pdf_writer = PyPDF2.PdfWriter()
-    pdf_writer.add_page(blank_row)
-    pdf_writer.write(os.path.join(tmp_dir, f'row_{j}.pdf'))
-
-def _log_reduction(
-        k,
-        reductions,
-        j,
-        stride_j,
-        height,
-        target_width,
-        target_height,
-        tmp_dir,
-        ast_file_name
-    ):
-    top_idx, bot_idx = j, j + (2 ** k) * stride_j
-
-    merge_path = os.path.join(tmp_dir, f'row_{k - 1}_')
-    if k == 0:
-        merge_path = os.path.join(tmp_dir, f'row_')
-
-    top_path = merge_path + f'{top_idx}.pdf'
-    bot_path = merge_path + f'{bot_idx}.pdf'
-
-    target_page = PyPDF2.PageObject.create_blank_page(
-        width=target_width,
-        height=height * 2 * (2 ** k)
-    )
-
-    if os.path.exists(top_path):
-        top_row = PyPDF2.PdfReader(top_path)
-
-        top_page = top_row.pages[0]
-        top_page.add_transformation(
-            PyPDF2.Transformation().translate(0, height * (2 ** k))
-        )
-        top_page.mediabox = target_page.mediabox
-
-        target_page.merge_page(top_page)
-
-    if os.path.exists(bot_path):
-        bot_row = PyPDF2.PdfReader(bot_path)
-
-        bot_page = bot_row.pages[0]
-        bot_page.add_transformation(
-            PyPDF2.Transformation().translate(0, 0)
-        )
-        bot_page.mediabox = target_page.mediabox
-
-        target_page.merge_page(bot_page)
-
-    if k != reductions - 1:
-        pdf_writer = PyPDF2.PdfWriter()
-        pdf_writer.add_page(target_page)
-        pdf_writer.write(os.path.join(tmp_dir, f'row_{k}_{j}.pdf'))
-        return
-
-    blank_page = PyPDF2.PageObject.create_blank_page(
-        width=target_width,
-        height=target_height
-    )
-
-    target_page.add_transformation(
-        PyPDF2.Transformation().translate(
-            0,
-            target_height - target_page.mediabox.height
-        )
-    )
-    target_page.mediabox = blank_page.mediabox
-
-    blank_page.merge_page(target_page)
-
-    if os.path.dirname(ast_file_name) != '':
-        os.makedirs(
-            os.path.dirname(ast_file_name),
-            exist_ok=True
-        )
-
-    pdf_writer = PyPDF2.PdfWriter()
-    pdf_writer.add_page(blank_page)
-    pdf_writer.write(ast_file_name)
-
-def print_asts_2d(asts, ast_file_name):
-    stride_i = 25
-    stride_j = 25
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        max_row_idx = max([ast[1] + (ast[2] - 1) * ast[4] for ast in asts])
-        max_col_idx = max([ast[0] + (ast[2] - 1) * ast[3] for ast in asts])
-
-        max_row = stride_i * int((max_row_idx + stride_i) / stride_i)
-        max_col = stride_j * int((max_col_idx + stride_j) / stride_j)
-
-        print("Plotting PDFs...")
-        total_pdfs = int((max_row / stride_i) * (max_col / stride_j))
-        with tqdm(total=total_pdfs) as pbar:
-            with ProcessPoolExecutor() as executor:
-                for i in range(0, max_row, stride_i):
-                    for j in range(0, max_col, stride_j):
-                        executor.submit(
-                            _plot_matrix_block,
-                            i,
-                            j,
-                            stride_i,
-                            stride_j,
-                            asts,
-                            tmp_dir
-                        ).add_done_callback(lambda _: pbar.update())
-
-        load_path = os.path.join(tmp_dir, '0_0.pdf')
-
-        pdf = PyPDF2.PdfReader(load_path)
-        page = pdf.pages[0]
-
-        width = page.mediabox.width
-        height = page.mediabox.height
-        target_width = int(width * (max_row_idx + 1) / stride_i)
-        target_height = int(height * (max_col_idx + 1) / stride_j)
-
-        print("Merging PDFs...")
-        merges = int(max_col / stride_j)
-        reductions = int(np.log2(max_col / stride_j)) + 1
-        with tqdm(total=merges + reductions) as pbar:
-            with ProcessPoolExecutor() as executor:
-                for j in range(0, max_col, stride_j):
-                    executor.submit(
-                        _merge_matrix_block,
-                        j,
-                        stride_i,
-                        max_row,
-                        width,
-                        height,
-                        target_width,
-                        tmp_dir
-                    ).add_done_callback(lambda _: pbar.update())
-
-            with ProcessPoolExecutor() as executor:
-                for k in range(0, reductions):
-                    futures = []
-                    for j in range(0, max_col, stride_j * (2 ** (k + 1))):
-                        future = executor.submit(
-                            _log_reduction,
-                            k,
-                            reductions,
-                            j,
-                            stride_j,
-                            height,
-                            target_width,
-                            target_height,
-                            tmp_dir,
-                            ast_file_name
-                        )
-                        futures.append(future)
-
-                    for future in futures:
-                        future.result()
-
-                    pbar.update()
+        return page.mediabox.width, page.mediabox.height
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        prog='AST 2D plotter',
-        description='''A small Python utility to plot a list of ASTs in a 2D
- plane'''
+        prog='AST Plotter',
+        description='A Python utility to plot ASTs in a 2D plane'
     )
 
     parser.add_argument(
@@ -414,12 +438,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     ast_file = args.input_ast_file
-    asts = read_ast_file(ast_file)
-
-    ast_file_name = os.path.basename(ast_file)
-    ast_file_name = f'{os.path.splitext(ast_file_name)[0]}.pdf'
-
+    output_file = os.path.basename(ast_file)
+    output_file = f'{os.path.splitext(output_file)[0]}.pdf'
     if args.output_pdf:
-        ast_file_name = args.output_pdf
+        output_file = args.output_pdf
 
-    print_asts_2d(asts, ast_file_name)
+    asts = ASTReader(ast_file).read()
+    ASTPlotter(asts, output_file).plot()
