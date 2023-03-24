@@ -11,7 +11,7 @@ type Uwc = (Vec<Vec<i32>>, Vec<i32>, Vec<i32>);
 
 pub struct SPFGen {
     ast_list: Vec<Piece>,
-    uwc_list: Vec<(usize, Uwc)>,
+    uwc_list: Vec<(Uwc, usize)>,
     pub nrows: usize,
     pub ncols: usize,
     pub nnz: usize,
@@ -38,9 +38,9 @@ impl SPFGen {
         // Finally insert (1,0,0) pattern. (Has to be the last one):
         distinct_patterns.insert((1,0,0), distinct_patterns.len());
 
-        let uwc_list: Vec<(usize, Uwc)> = ast_list
+        let uwc_list: Vec<(Uwc, usize)> = ast_list
             .iter()
-            .map(|(_,_,pattern)| (*distinct_patterns.get(pattern).unwrap(), pattern_to_uwc(pattern)))
+            .map(|(_,_,pattern)| (pattern_to_uwc(pattern), *distinct_patterns.get(pattern).unwrap()))
             .collect();
 
         let distinct_uwc: LinkedHashMap<Uwc, usize> = distinct_patterns
@@ -74,7 +74,7 @@ impl SPFGen {
 
     pub fn print_uwc_list(&self, show_eqs: bool) {
         println!("Uwc List:\nid\tU\t\tw\tc");
-        self.uwc_list.iter().for_each(|(id,(u,w,c))| {
+        self.uwc_list.iter().for_each(|((u,w,c), id)| {
             print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(u, w) } else { "\n".to_string() } });
         });
     }
@@ -121,7 +121,7 @@ impl SPFGen {
 
         // This has been brought from down below, as it is useful for the following computation
         // We also know that regular pieces are at the end of the list
-        let piece_cutoff = self.uwc_list.iter().filter(|(id,_)| id != ninc_nonzero_pattern_id).count();
+        let piece_cutoff = self.uwc_list.iter().filter(|(_, id)| id != ninc_nonzero_pattern_id).count();
         // println!("Piece cutoff = {}", piece_cutoff);
 
         let shape_dims_max: i16 = {
@@ -183,7 +183,7 @@ impl SPFGen {
         // VERY IMPORTANT! Remember that uwc_list and ast_list have to be in the same order for this to be coherent
         let mut data_offset: i32 = 0;
         for idx in 0..piece_cutoff {
-            let (id,(u,w,_)) = &self.uwc_list[idx];
+            let ((u,w,_), id) = &self.uwc_list[idx];
 
             // Write shape id
             file.write_i16::<LittleEndian>(*id as i16).unwrap();
