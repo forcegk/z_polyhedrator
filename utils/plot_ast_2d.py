@@ -59,7 +59,10 @@ import shutil
 import PyPDF2
 import argparse
 import tempfile
+import matplotlib
 import charset_normalizer
+
+matplotlib.use('Agg')
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -84,15 +87,25 @@ class AST:
 
     def is_in_block(self, min_x, max_x, min_y, max_y):
         for k in range(self._n):
-            if self._col + k * self._j < min_x:
-                continue
-            if self._col + k * self._j >= max_x:
-                continue
-            if self._row + k * self._i < min_y:
-                continue
-            if self._row + k * self._i >= max_y:
-                continue
-            return True
+            x = self._col + k * self._j
+            y = self._row + k * self._i
+            if x >= min_x and x < max_x and y >= min_y and y < max_y:
+                return True
+        for k in range(self._n - 1):
+            start_x = self._col + k * self._j
+            start_y = self._row + k * self._i
+            end_x = self._col + (k + 1) * self._j
+            end_y = self._row + (k + 1) * self._i
+
+            if start_x > end_x:
+                start_x, end_x = end_x, start_x
+            if start_y > end_y:
+                start_y, end_y = end_y, start_y
+
+            for x in range(start_x, end_x + 1):
+                for y in range(start_y, end_y + 1):
+                    if x >= min_x and x < max_x and y >= min_y and y < max_y:
+                        return True
         return False
 
     def plot(self, color, ax):
