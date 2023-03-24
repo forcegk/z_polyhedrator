@@ -2,11 +2,14 @@ extern crate sprs;
 extern crate text_io;
 
 use std::{path::PathBuf, process::exit};
+use colored::Colorize;
 
 mod spsearx;
-use colored::Colorize;
 #[allow(unused_imports)]
 use spsearx::{SpSearxMatrix,SpSearxPatternsFlags};
+
+mod spaugment;
+#[allow(unused_imports)]
 
 mod spfgen;
 #[allow(unused_imports)]
