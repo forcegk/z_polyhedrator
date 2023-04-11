@@ -3,21 +3,19 @@ use std::{fs::{File, self}, path::PathBuf, collections::HashSet, io::{SeekFrom, 
 use byteorder::{WriteBytesExt, LittleEndian};
 use linked_hash_map::LinkedHashMap;
 use sprs::{CsMat, TriMat};
-use crate::utils;
 
-type Pattern = (i32, i32, i32);
-type Piece = (usize, usize, Pattern);
-type Uwc = (Vec<Vec<i32>>, Vec<i32>, Vec<i32>);
+use crate::utils::{Pattern,Piece,Uwc,OriginUwc};
+use crate::utils::{pattern_to_uwc,convex_hull_1d};
 
 pub struct SPFGen {
     ast_list: Vec<Piece>,
-    uwc_list: Vec<(Uwc, usize)>,
+    uwc_list: Vec<(Uwc, i32)>,
     pub nrows: usize,
     pub ncols: usize,
     pub nnz: usize,
     pub inc_nnz: usize,
-    distinct_patterns: LinkedHashMap<Pattern, usize>,
-    distinct_uwc: LinkedHashMap<Uwc, usize>
+    distinct_patterns: LinkedHashMap<Pattern, i32>,
+    distinct_uwc: LinkedHashMap<Uwc, i32>
 }
 
 impl SPFGen {
@@ -26,24 +24,24 @@ impl SPFGen {
         let inc_nnz = nnz - ninc_nnz;
 
         // Create distinct pattern LinkedHashMap indexed 0..used_patterns with the help of an intermediate HashSet
-        let mut distinct_patterns: LinkedHashMap<Pattern, usize> = ast_list
+        let mut distinct_patterns: LinkedHashMap<Pattern, i32> = ast_list
             .iter()
             .map(|(_,_,pattern)| *pattern)
             .filter(|(i,_,_)| *i > 1)
             .collect::<HashSet<Pattern>>()
             .into_iter()
             .enumerate()
-            .map(|(idx, pattern)| (pattern, idx))
+            .map(|(idx, pattern)| (pattern, idx as i32))
             .collect();
         // Finally insert (1,0,0) pattern. (Has to be the last one):
-        distinct_patterns.insert((1,0,0), distinct_patterns.len());
+        distinct_patterns.insert((1,0,0), -1i32);
 
-        let uwc_list: Vec<(Uwc, usize)> = ast_list
+        let uwc_list: Vec<(Uwc, i32)> = ast_list
             .iter()
             .map(|(_,_,pattern)| (pattern_to_uwc(pattern), *distinct_patterns.get(pattern).unwrap()))
             .collect();
 
-        let distinct_uwc: LinkedHashMap<Uwc, usize> = distinct_patterns
+        let distinct_uwc: LinkedHashMap<Uwc, i32> = distinct_patterns
             .iter()
             .map(|(pattern, id)| (pattern_to_uwc(pattern), *id))
             .collect();
@@ -86,22 +84,35 @@ impl SPFGen {
         });
     }
 
+    pub fn get_uwc_list(&self) -> Vec<(Uwc, i32)> {
+        self.uwc_list.clone()
+    }
+
+    pub fn get_orig_uwc_list(&self) -> Vec<(OriginUwc, i32)> {
+        let mut retvec: Vec<(OriginUwc, i32)> = vec![];
+
+        for idx in 0..self.uwc_list.len() {
+            let (uwc, id) = self.uwc_list.get(idx).unwrap();
+            let (x,y, _) = self.ast_list.get(idx).unwrap();
+            retvec.push(((*x, *y, uwc.clone()), *id));
+        }
+
+        retvec
+    }
+
     pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str) {
         // Read matrixmarket f64 value matrix
-        let f64_value_matrix: CsMat<f64> = utils::read_matrix_market_csr(input_value_matrix);
+        let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(input_value_matrix);
 
         // Quick sanity check
         if f64_value_matrix.nnz() != self.nnz {
             panic!("NNZ of value matrix and pattern list do not match. Maybe double check your params?");
         }
-        
+
         let mut file = File::create(output_file_path).expect(format!("Unable to create file {}", output_file_path).as_str());
-        
+
         let path = PathBuf::from(output_file_path);
         eprintln!("Writing to file {}", fs::canonicalize(&path).unwrap().display());
-        
-        // Get index of single nonzeros (not in a pattern to filter them out of the next foreach)
-        let ninc_nonzero_pattern_id = self.distinct_patterns.get(&(1,0,0)).unwrap();
 
         // Write header
         file.write_i32::<LittleEndian>(self.nnz as i32).unwrap();
@@ -119,9 +130,12 @@ impl SPFGen {
         //  (python code `f.seek ( 26 )` on write_spf func at around line 810)
         file.write_i32::<LittleEndian>(0i32).unwrap();
 
+        // Get index of single nonzeros (not in a pattern to filter them out of the next foreach)
+        // let ninc_nonzero_pattern_id = self.distinct_patterns.get(&(1,0,0)).unwrap();
+        let ninc_nonzero_pattern_id = -1i32;
         // This has been brought from down below, as it is useful for the following computation
         // We also know that regular pieces are at the end of the list
-        let piece_cutoff = self.uwc_list.iter().filter(|(_, id)| id != ninc_nonzero_pattern_id).count();
+        let piece_cutoff = self.uwc_list.iter().filter(|(_, id)| *id != ninc_nonzero_pattern_id).count();
         // println!("Piece cutoff = {}", piece_cutoff);
 
         let shape_dims_max: i16 = {
@@ -138,7 +152,7 @@ impl SPFGen {
         }
 
         // println!("Writing u={:?}, w={:?}, c={:?} with id={:?}", u, w, c, id);
-        self.distinct_uwc.iter().filter(|(_,id)| *id != ninc_nonzero_pattern_id).for_each(|((u,w,c), id)| {
+        self.distinct_uwc.iter().filter(|(_,id)| **id != ninc_nonzero_pattern_id).for_each(|((u,w,c), id)| {
             // Write shape id
             file.write_i16::<LittleEndian>(*id as i16).unwrap();
             // Write type of encoding. 0 = vertex_rec, 1 = vertex_gen, 2 = ineqs . FIXME only writes vertex_rec
@@ -271,22 +285,6 @@ impl SPFGen {
     }
 }
 
-// TODO fix this for n-dimensional (currently 1D only)
-#[inline(always)]
-#[allow(dead_code)]
-fn pattern_to_uwc(pattern: &Pattern) -> Uwc {
-    let (n, i, j) = pattern;
-
-    let it_range = n-1;
-
-    // TODO fix here for n-dimensional (currently 1D only)
-    let u = vec![ vec![-1], vec![1] ];
-    let w = vec![ it_range, 0 ];
-    let c = vec![ *i, *j ];
-
-    return (u, w, c);
-}
-
 #[inline(always)]
 #[allow(dead_code)]
 fn format_eqs(u: &Vec<Vec<i32>>, w: &Vec<i32>) -> String {
@@ -320,11 +318,4 @@ fn format_eqs(u: &Vec<Vec<i32>>, w: &Vec<i32>) -> String {
     str_list.push("\n".to_string());
 
     str_list.join("")
-}
-
-#[inline(always)]
-#[allow(dead_code)]
-fn convex_hull_1d(_u: &Vec<Vec<i32>>, w: &Vec<i32>, _dense: bool) -> Vec<i32>{
-    // FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore :)
-    (w[1]..=w[0]).collect::<Vec<i32>>()
 }

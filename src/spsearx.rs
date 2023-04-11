@@ -2,10 +2,8 @@ use text_io::scan;
 use std::io::BufRead;
 use sprs::CsMat;
 use bitflags::bitflags;
-use crate::utils;
 
-type Pattern = (i32, i32, i32);
-type Piece = (usize, usize, Pattern);
+use crate::utils::{Piece,Pattern,Uwc};
 
 pub struct SpSearxMatrix {
     value_matrix: CsMat<bool>,
@@ -27,7 +25,7 @@ bitflags! {
 
 impl SpSearxMatrix {
     pub fn from_file(path: &str) -> SpSearxMatrix {
-        let f64_value_matrix: CsMat<f64> = utils::read_matrix_market_csr(path);
+        let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(path);
 
         // println!("{:?}", (f64_value_matrix.rows(), f64_value_matrix.cols(), f64_value_matrix.nnz()));
         // f64_value_matrix.iter().for_each(|(&val, (row, col))| {

@@ -6,14 +6,15 @@ use colored::Colorize;
 
 mod spsearx;
 #[allow(unused_imports)]
-use spsearx::{SpSearxMatrix,SpSearxPatternsFlags};
+use crate::spsearx::{SpSearxMatrix,SpSearxPatternsFlags};
 
 mod spaugment;
 #[allow(unused_imports)]
+use crate::spaugment::SpAugment;
 
 mod spfgen;
 #[allow(unused_imports)]
-use spfgen::SPFGen;
+use crate::spfgen::SPFGen;
 
 mod utils;
 
@@ -122,5 +123,7 @@ fn main() {
         if output_spf_file_path.0 {
             spfgen.write_spf(matrixmarket_file_path, output_spf_file_path.1.as_str());
         }
+
+        let spaugment = SpAugment::from_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
     }
 }
