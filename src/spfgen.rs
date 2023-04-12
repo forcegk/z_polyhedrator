@@ -1,7 +1,8 @@
-use std::{fs::{File, self}, path::PathBuf, collections::HashSet, io::{SeekFrom, Seek}};
+use std::{fs::{File, self}, path::PathBuf, io::{SeekFrom, Seek}};
 
 use byteorder::{WriteBytesExt, LittleEndian};
 use linked_hash_map::LinkedHashMap;
+use linked_hash_set::LinkedHashSet;
 use sprs::{CsMat, TriMat};
 
 use crate::utils::{Pattern,Piece,Uwc,OriginUwc};
@@ -28,12 +29,15 @@ impl SPFGen {
             .iter()
             .map(|(_,_,pattern)| *pattern)
             .filter(|(i,_,_)| *i > 1)
-            .collect::<HashSet<Pattern>>()
+            .collect::<LinkedHashSet<Pattern>>()
             .into_iter()
             .enumerate()
             .map(|(idx, pattern)| (pattern, idx as i32))
             .collect();
+
         // Finally insert (1,0,0) pattern. (Has to be the last one):
+        // This can not be removed, as we always take into account the single nonzero values,
+        // even in the case of no single points remaining.
         distinct_patterns.insert((1,0,0), -1i32);
 
         let uwc_list: Vec<(Uwc, i32)> = ast_list
@@ -84,6 +88,7 @@ impl SPFGen {
         });
     }
 
+    #[allow(dead_code)]
     pub fn get_uwc_list(&self) -> Vec<(Uwc, i32)> {
         self.uwc_list.clone()
     }

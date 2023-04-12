@@ -15,6 +15,7 @@ stringreader = "0.1.1"
 num-traits = "0.2.15"
 colored = "2.0.0"
 xflags = "0.3.1"
+linked_hash_set = "0.1.4"
 
 [profile.release]
 opt-level = 3

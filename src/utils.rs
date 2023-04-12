@@ -45,6 +45,8 @@ pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str) -> CsMat<T> {
     return value_matrix;
 }
 
+#[inline(always)]
+#[allow(dead_code)]
 pub fn flatten<T>(nested: Vec<Vec<T>>) -> Vec<T> {
     nested.into_iter().flatten().collect()
 }
@@ -63,6 +65,13 @@ pub fn pattern_to_uwc(pattern: &Pattern) -> Uwc {
     let c = vec![ *i, *j ];
 
     return (u, w, c);
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub fn orig_uwc_to_piece_1d(uwc: &OriginUwc) -> Piece {
+    let (x, y, (_,w,c)) = uwc;
+    (*x,*y,(w[0]+1,c[0],c[1]))
 }
 
 #[inline(always)]

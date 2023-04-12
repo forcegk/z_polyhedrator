@@ -3,7 +3,7 @@ use std::io::BufRead;
 use sprs::CsMat;
 use bitflags::bitflags;
 
-use crate::utils::{Piece,Pattern,Uwc};
+use crate::utils::{Piece,Pattern};
 
 pub struct SpSearxMatrix {
     value_matrix: CsMat<bool>,

@@ -124,6 +124,8 @@ fn main() {
             spfgen.write_spf(matrixmarket_file_path, output_spf_file_path.1.as_str());
         }
 
-        let spaugment = SpAugment::from_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
+        let mut spaugment = SpAugment::from_1d_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
+
+        spaugment.augment_dimensionality(2);
     }
 }
