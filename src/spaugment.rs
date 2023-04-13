@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 
 use crate::utils::{Pattern,Piece,Uwc,OriginUwc};
@@ -135,14 +136,29 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, m
         return None;
     }
 
-    for basepat in 0..origins_list.len() {
+    let fn_tuple_sub = |(x1,y1):(i32,i32),(x2,y2):(i32,i32)| (x1-x2, y1-y2);
+    let mut basepat: usize = 0;
+
+    let strides = origins_list
+        .iter()
+        .tuple_windows()
+        .map(|(a,b)| fn_tuple_sub (*b, *a))
+        .collect::<Vec<(i32,i32)>>();
+
+    println!("TESTING: {:?}", strides);
+
+    loop {
+        if origins_list.get(basepat).is_none() { break; }
+
         // Normalize distances to first pattern
         let base = *origins_list.get(basepat).unwrap();
         for origin in origins_list.iter_mut() {
-            *origin = (|(x1,y1),(x2,y2)| (x1-x2, y1-y2)) (*origin, base); 
+            *origin = fn_tuple_sub (*origin, base);
         }
         
         println!("Normalized for #{}: {:?}", basepat, origins_list);
+
+        basepat += 1;
     }
 
     // Begin strided search
