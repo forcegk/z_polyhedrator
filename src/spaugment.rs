@@ -68,8 +68,10 @@ impl SpAugment {
 
         println!("Compensation {}", single_compensation);
 
-        let mut start_ptr: i32 = 0;
-        let mut end_ptr: i32 = 0;
+        let mut start_ptr: usize = 0;
+        let mut end_ptr: usize = 0;
+
+        // PRECONDITION: Metapatterns are not necessarily ordered, but same metapatterns are consecutive in the list
 
         // FIXME Maybe generalize this to support any-dimensional input
         for curr_dim in 2..=target_dim {
@@ -81,7 +83,11 @@ impl SpAugment {
             let mut origins_list: Vec<(i32, i32)> = vec![];
             let mut curr_id: i32 = 0; // Zero here to save an iteration. Not really needed
             
-            let mut metapat_pieces_iter = self.meta_pattern_pieces.iter();
+            // Advance pointer to current dimensionality pieces
+            let mut metapat_pieces_iter = self.meta_pattern_pieces.iter()
+                .filter(|(_,id)| **id != -1)
+                .skip(start_ptr);
+            // TODO a filter could be added here to skip single nonzeros or some other piece types
 
             let mut new_metapat_pieces: LinkedHashMap<MetaPatternPiece, i32> = LinkedHashMap::new();
             let mut new_metapats: LinkedHashMap<i32, MetaPattern> = LinkedHashMap::new();
@@ -90,8 +96,8 @@ impl SpAugment {
                 let opt = metapat_pieces_iter.next();
                 
                 if opt.is_none() || matches!(opt, Some((_,id)) if curr_id != *id) {
-                    // Compute metapatterns
-                    compute_metapatterns(&mut origins_list);
+                    // Compute metapatterns FIXME parametrize max and min strides
+                    compute_metapatterns(&mut origins_list, 100, 1);
 
                     // And prepare for next batch
                     origins_list.clear();
@@ -105,8 +111,12 @@ impl SpAugment {
                 }
 
                 let ((x,y),_) = opt.unwrap();
-                origins_list.push((*x as i32, *y as i32))
+                origins_list.push((*x as i32, *y as i32));
+
+                start_ptr += 1;
             }
+
+            println!("Startptr: {:?}. Curr_id: {:?}", start_ptr, curr_id);
 
             // Add new_metapat_pieces and new_metapats to current ones
             
@@ -116,9 +126,32 @@ impl SpAugment {
 
 #[inline(always)]
 #[allow(dead_code)]
-fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHashMap<i32, MetaPattern>, LinkedHashMap<MetaPatternPiece, i32>)> {
+fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, min_stride: usize) -> Option<(LinkedHashMap<i32, MetaPattern>, LinkedHashMap<MetaPatternPiece, i32>)> {
 
     println!("Metapatterns: {:?}", origins_list);
 
+    // No feasible higher order metapatterns
+    if origins_list.len() <= 1 {
+        return None;
+    }
+
+    for basepat in 0..origins_list.len() {
+        // Normalize distances to first pattern
+        let base = *origins_list.get(basepat).unwrap();
+        for origin in origins_list.iter_mut() {
+            *origin = (|(x1,y1),(x2,y2)| (x1-x2, y1-y2)) (*origin, base); 
+        }
+        
+        println!("Normalized for #{}: {:?}", basepat, origins_list);
+    }
+
+    // Begin strided search
+
+
+
     None // TODO FIX
+
+
+
+
 }
