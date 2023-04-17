@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::time::Instant;
 
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -139,13 +140,34 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, m
     let fn_tuple_sub = |(x1,y1):(i32,i32),(x2,y2):(i32,i32)| (x1-x2, y1-y2);
     let mut basepat: usize = 0;
 
+    let start = Instant::now();
+
+    // Get all strides between pieces
     let strides = origins_list
         .iter()
-        .tuple_windows()
+        .tuple_combinations()
         .map(|(a,b)| fn_tuple_sub (*b, *a))
         .collect::<Vec<(i32,i32)>>();
 
-    println!("TESTING: {:?}", strides);
+    let duration_strides = start.elapsed();
+    let start = Instant::now();
+
+    println!("STRIDES: {:?}", strides);
+
+    let occurrences = strides
+        .iter()
+        .into_group_map_by(|x| **x)
+        .into_iter()
+        .map(|(k,v)| (k, v.len() as u32))
+        .sorted_by_key(|(_,reps)| std::cmp::Reverse(*reps))
+        .collect::<LinkedHashMap<(i32,i32),u32>>()
+        .shrink_to_fit();
+
+    println!("OCCURRENCES: {:?}", occurrences);
+
+    let duration = start.elapsed();
+
+    println!("Elapsed: strides={:?}, group={:?}", duration_strides, duration);
 
     loop {
         if origins_list.get(basepat).is_none() { break; }
