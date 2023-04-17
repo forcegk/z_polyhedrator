@@ -160,8 +160,7 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, m
         .into_iter()
         .map(|(k,v)| (k, v.len() as u32))
         .sorted_by_key(|(_,reps)| std::cmp::Reverse(*reps))
-        .collect::<LinkedHashMap<(i32,i32),u32>>()
-        .shrink_to_fit();
+        .collect::<LinkedHashMap<(i32,i32),u32>>();
 
     println!("OCCURRENCES: {:?}", occurrences);
 
