@@ -1,8 +1,10 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
+use colored::Colorize;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
+use sprs::CsMat;
 
 use crate::utils::{Pattern,Piece,Uwc,OriginUwc};
 use crate::utils::orig_uwc_to_piece_1d;
@@ -137,10 +139,15 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, m
         return None;
     }
 
-    let fn_tuple_sub = |(x1,y1):(i32,i32),(x2,y2):(i32,i32)| (x1-x2, y1-y2);
-    let mut basepat: usize = 0;
+    let mut MetaPatternList: LinkedHashMap<i32, MetaPattern> = LinkedHashMap::new();
+    let mut MetaPatternPieceList: LinkedHashMap<MetaPatternPiece, i32> = LinkedHashMap::new();
 
-    let start = Instant::now();
+    let fn_tuple_sub = |(x1,y1):(i32,i32),(x2,y2):(i32,i32)| (x1-x2, y1-y2);
+
+    let (_,max_col) = *origins_list.iter().max_by_key(|(_,col)| *col).unwrap();
+    let (max_row,_) = *origins_list.iter().max_by_key(|(row,_)| *row).unwrap();
+
+    println!("Max col = {}, Max row = {}", max_col, max_row);
 
     // Get all strides between pieces
     let strides = origins_list
@@ -148,9 +155,6 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, m
         .tuple_combinations()
         .map(|(a,b)| fn_tuple_sub (*b, *a))
         .collect::<Vec<(i32,i32)>>();
-
-    let duration_strides = start.elapsed();
-    let start = Instant::now();
 
     println!("STRIDES: {:?}", strides);
 
@@ -164,24 +168,50 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, m
 
     println!("OCCURRENCES: {:?}", occurrences);
 
-    let duration = start.elapsed();
+    // let mut basepat: usize = 0;
+    // loop {
+    //     if origins_list.get(basepat).is_none() { break; }
 
-    println!("Elapsed: strides={:?}, group={:?}", duration_strides, duration);
+    //     // // Normalize distances to first pattern
+    //     // let base = *origins_list.get(basepat).unwrap();
+    //     // for origin in origins_list.iter_mut() {
+    //     //     *origin = fn_tuple_sub (*origin, base);
+    //     // }
+    //     // println!("Normalized for #{}: {:?}", basepat, origins_list);
 
-    loop {
-        if origins_list.get(basepat).is_none() { break; }
+    //     basepat += 1;
+    // }
 
-        // Normalize distances to first pattern
-        let base = *origins_list.get(basepat).unwrap();
-        for origin in origins_list.iter_mut() {
-            *origin = fn_tuple_sub (*origin, base);
-        }
-        
-        println!("Normalized for #{}: {:?}", basepat, origins_list);
+    // let mut value_matrix = CsMat::empty(f64_value_matrix.storage(), f64_value_matrix.inner_dims());
 
-        basepat += 1;
+    // Compose sparse matrix with origins_list
+    let mut expl_matrix: CsMat<bool> = CsMat::zero((max_row as usize, max_col as usize));
+    for (row,col) in origins_list {
+        expl_matrix.insert(*row as usize, *col as usize, false);
     }
 
+    println!("Mat = {:?}", expl_matrix);
+
+    let mut max_n: i64;
+    let mut new_max_n: i64;
+    // Most repeated pattern first (MRPF)
+    'pat_for: for ((row,col), reps) in occurrences.iter() {
+        max_n = check_metapattern_reps(&expl_matrix, (*row as usize,*col as usize), &(*reps as i32,*row,*col)) as i64;
+        new_max_n = max_n - 1;
+
+        loop {
+            if new_max_n <= 0 {
+                break 'pat_for;
+            }
+
+            if new_max_n == max_n {
+                break 'pat_for;
+            }
+
+            max_n = new_max_n;
+            new_max_n = check_metapattern_reps(&expl_matrix, (*row as usize,*col as usize), &(max_n as i32,*row,*col)) as i64;
+        }
+    }
     // Begin strided search
 
 
@@ -191,4 +221,65 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, m
 
 
 
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+fn check_metapattern_reps(csmat: &CsMat<bool>, curr_pos: (usize, usize), pattern: &Pattern) -> usize {
+    let &(n,i,j) = pattern;
+    let (x,y) = curr_pos;
+
+    // println!("{:?}", (x,y,n,i,j));
+
+    // Discard already dumped patterns without computing bounds first
+    if *csmat.get(x,y).unwrap() {
+        return 0;
+    }
+
+    let max_pos_x = x as i64 + (n-1) as i64 * i as i64;
+    let max_pos_y = y as i64 + (n-1) as i64 * j as i64;
+
+    // Discard out-of-bounds patterns
+    if max_pos_x < 0 || max_pos_x >= csmat.rows() as i64 || max_pos_y < 0 || max_pos_y >= csmat.cols() as i64 {
+        let max_nreps_rows;
+        if i == 0 {
+            max_nreps_rows = std::i64::MAX;
+        } else {
+            let l_max_nreps_rows = csmat.rows() as i64 + i as i64/2i64;
+            let l_max_nreps_rows = l_max_nreps_rows - (l_max_nreps_rows%i as i64);
+            let l_max_nreps_rows = l_max_nreps_rows / i as i64;
+            max_nreps_rows = l_max_nreps_rows;
+        }
+
+        let max_nreps_cols;
+        if j == 0 {
+            max_nreps_cols = std::i64::MAX;
+        } else {
+            let l_max_nreps_cols = csmat.cols() as i64 + j as i64/2i64;
+            let l_max_nreps_cols = l_max_nreps_cols - (l_max_nreps_cols%j as i64);
+            let l_max_nreps_cols = l_max_nreps_cols / j as i64;
+            max_nreps_cols = l_max_nreps_cols;
+        }
+
+        println!("{} Max reps: rows = {}, cols = {}. Csmat rows = {}, cols = {}. Stride i = {}, j = {}", "[MP_REPS]".purple().bold() ,max_nreps_rows, max_nreps_cols, csmat.rows(), csmat.cols(), i, j);
+
+        return std::cmp::min(max_nreps_rows, max_nreps_cols) as usize;
+    }
+
+    // We can start on the next pattern
+    for ii in 1..n {
+        let position = csmat.get((x as i64 + (i as i64 * ii as i64)) as usize, (y as i64 + (j as i64 * ii as i64)) as usize);
+        match position {
+            Some(&is_in_pat) => {
+                if is_in_pat {
+                    return ii as usize;
+                } else {
+                    continue;
+                }
+            },
+            None    => return ii as usize,
+        }
+    }
+
+    return n as usize;
 }
