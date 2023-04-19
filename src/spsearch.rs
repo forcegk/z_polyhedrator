@@ -100,11 +100,11 @@ impl SpSearchMatrix {
             });
 
             // First pass looking for patterns
-            nonzero_positions.iter().enumerate().for_each(|(_it, &(row, col))| {
+            nonzero_positions.iter().for_each(|(row, col)| {
                 let mut found: bool = false;
                 let mut piece: Piece = (0,0,(0,0,0));
                 'pattern_search: for pattern in self.patterns.iter(){
-                    let result = check_pattern(&self.value_matrix, (row,col), pattern);
+                    let result = check_pattern(&self.value_matrix, (*row,*col), pattern);
                     match result {
                         None => continue,
                         Some(found_piece) => {

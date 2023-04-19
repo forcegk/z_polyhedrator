@@ -1,3 +1,4 @@
+use std::cmp::max_by_key;
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -70,7 +71,9 @@ impl SpAugment {
             None => 0i32
         };
 
-        println!("Compensation {}", single_compensation);
+        println!("\n------- AUGMENT DIMENSIONALITY -------\n");
+
+        println!("Compensation {} (this accounts for elements with id=-1)", single_compensation);
 
         let mut start_ptr: usize = 0;
         let mut end_ptr: usize = 0;
@@ -85,7 +88,7 @@ impl SpAugment {
 
             // Aux variables for processing
             let mut origins_list: Vec<(i32, i32)> = vec![];
-            let mut curr_id: i32 = 0; // Zero here to save an iteration. Not really needed
+            let mut curr_id: i32 = 0; // Zero here to save an iteration (only if meta_pattern_pieces is sorted). Not really needed apart from that
             
             // Advance pointer to current dimensionality pieces
             let mut metapat_pieces_iter = self.meta_pattern_pieces.iter()
@@ -95,12 +98,16 @@ impl SpAugment {
             let mut new_metapat_pieces: LinkedHashMap<MetaPatternPiece, i32> = LinkedHashMap::new();
             let mut new_metapats: LinkedHashMap<i32, MetaPattern> = LinkedHashMap::new();
 
+            // This loop loads all consecutive metapatterns with the same id into origins_list, the executes the "if opt.is_none() [...]"
             loop {
                 let opt = metapat_pieces_iter.next();
                 
                 if opt.is_none() || matches!(opt, Some((_,id)) if curr_id != *id) {
+                
+                    println!("\n------- compute_metapatterns for id = {} -------", curr_id);
+
                     // Compute metapatterns FIXME parametrize max and min strides
-                    compute_metapatterns(&mut origins_list, 100, 1);
+                    compute_metapatterns(&mut origins_list);
 
                     // And prepare for next batch
                     origins_list.clear();
@@ -113,6 +120,7 @@ impl SpAugment {
                     curr_id = *id;
                 }
 
+                // Append consecutive same-id metapattern pieces to origins_list
                 let ((x,y),_) = opt.unwrap();
                 origins_list.push((*x as i32, *y as i32));
 
@@ -121,7 +129,7 @@ impl SpAugment {
 
             println!("Startptr: {:?}. Curr_id: {:?}", start_ptr, curr_id);
 
-            // Add new_metapat_pieces and new_metapats to current ones
+            // TODO Add new_metapat_pieces and new_metapats to current ones
             
         }
     }
@@ -129,7 +137,7 @@ impl SpAugment {
 
 #[inline(always)]
 #[allow(dead_code)]
-fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, min_stride: usize) -> Option<(LinkedHashMap<i32, MetaPattern>, LinkedHashMap<MetaPatternPiece, i32>)> {
+fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHashMap<i32, MetaPattern>, LinkedHashMap<MetaPatternPiece, i32>)> {
 
     println!("Metapatterns: {:?}", origins_list);
 
@@ -191,21 +199,59 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, m
 
     println!("Mat = {:?}", expl_matrix);
 
-    'outer: loop {
-        // Most repeated pattern first (MRPF)
-        'inner: for ((row,col), reps) in occurrences.iter_mut() {
-            
-            println!("(row = {}, col = {}, reps = {})", *row, *col, *reps);
+    let fn_best_piece = |p1:Piece,p2:Piece| std::cmp::max_by_key(p1, p2, |(_,_,(n,_,_))| *n);
 
-            // let result: Option<Piece> = check_metapattern_reps(&self.value_matrix, (row,col), pattern);
-            
-            // loop {
-            //     max_n = new_max_n;
-            //     new_max_n = check_metapattern_reps(&expl_matrix, (*row as usize,*col as usize), &(max_n as i32,*row,*col)) as i64;
-            // }
+    'outer: loop {
+        // println!("(row = {}, col = {}, reps = {})", *row, *col, *reps);
+        
+        // Most repeated pattern first (MRPF)
+        let mut occ_it_peekable = occurrences.iter_mut().peekable();
+        'inner: for ((offset_x,offset_y), reps) in occ_it_peekable {
+            let mut found: bool = false;
+            let mut best_piece: Piece = (0,0,(0,0,0));
+
+            // Continue to keep searching. Break to accept best_piece.
+            'innermost: for (value, (expl_row,expl_col)) in expl_matrix.iter() {
+                
+                    let result: Option<Piece> = check_metapattern_reps(&expl_matrix, (expl_row, expl_col), &(*reps as i32, *offset_x, *offset_y));
+                    match result {
+                        None => continue,
+                        Some((x,y,(n,i,j))) => {
+                            // Update best piece if needed
+                            best_piece = fn_best_piece(best_piece, (expl_row, expl_col, (n, *offset_x, *offset_y)));
+                            
+                            // Check if we need to keep searching
+                            if n < *reps as i32 {
+                                match occ_it_peekable.peek() {
+                                    Some(((next_offset_x,next_offset_y), next_reps)) => {
+                                        if n < **next_reps as i32 {
+                                            // continue searching
+                                            continue 'innermost;
+                                        }
+                                    },
+                                    None => break 'innermost, // this is the last one so commit with whatever we have
+                                }
+                            }
+
+
+
+                            
+                        },
+                    }
+            }
+
         }
 
+        // reorder occurrences
 
+
+
+            // let result: Option<Piece> = check_metapattern_reps(&expl_matrix, (*row as usize, *col as usize), pattern);
+            
+            // loop {
+                //     max_n = new_max_n;
+                //     new_max_n = check_metapattern_reps(&expl_matrix, (*row as usize,*col as usize), &(max_n as i32,*row,*col)) as i64;
+                // }
 
         break;
     }
