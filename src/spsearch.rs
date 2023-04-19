@@ -5,7 +5,7 @@ use bitflags::bitflags;
 
 use crate::utils::{Piece,Pattern};
 
-pub struct SpSearxMatrix {
+pub struct SpSearchMatrix {
     value_matrix: CsMat<bool>,
     // exploration_matrix: Vec<Prio>,
     pub nonzeros: usize,
@@ -16,15 +16,15 @@ pub struct SpSearxMatrix {
 }
 
 bitflags! {
-    pub struct SpSearxPatternsFlags: u64 {
+    pub struct SpSearchPatternsFlags: u64 {
         const NoFlags               = 0b0000_0000;
         const PatternFirst          = 0b0000_0001;
         const CellFirst             = 0b0000_0010;
     }
 }
 
-impl SpSearxMatrix {
-    pub fn from_file(path: &str) -> SpSearxMatrix {
+impl SpSearchMatrix {
+    pub fn from_file(path: &str) -> SpSearchMatrix {
         let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(path);
 
         // println!("{:?}", (f64_value_matrix.rows(), f64_value_matrix.cols(), f64_value_matrix.nnz()));
@@ -46,7 +46,7 @@ impl SpSearxMatrix {
         //     println!("{}: [{},{}]", val, row, col);
         // });
 
-        return SpSearxMatrix {
+        return SpSearchMatrix {
             value_matrix: value_matrix,
             // exploration_matrix: exploration_matrix,
             nonzeros: nonzeros,
@@ -81,12 +81,12 @@ impl SpSearxMatrix {
         });
     }
 
-    pub fn search_patterns(&mut self, flags: SpSearxPatternsFlags) {
+    pub fn search_patterns(&mut self, flags: SpSearchPatternsFlags) {
         // Parse possible flags
         // let skip_on_invalidation = flags.contains(SpGSearxPatternsFlags::SkipOnInvalidation);
 
-        let pattern_first = flags.contains(SpSearxPatternsFlags::PatternFirst);
-        let cell_first = flags.contains(SpSearxPatternsFlags::CellFirst);
+        let pattern_first = flags.contains(SpSearchPatternsFlags::PatternFirst);
+        let cell_first = flags.contains(SpSearchPatternsFlags::CellFirst);
 
         if !(pattern_first ^ cell_first) {
             panic!("Specify only one search priority flag!");

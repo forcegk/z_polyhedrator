@@ -91,7 +91,6 @@ impl SpAugment {
             let mut metapat_pieces_iter = self.meta_pattern_pieces.iter()
                 .filter(|(_,id)| **id != -1)
                 .skip(start_ptr);
-            // TODO a filter could be added here to skip single nonzeros or some other piece types
 
             let mut new_metapat_pieces: LinkedHashMap<MetaPatternPiece, i32> = LinkedHashMap::new();
             let mut new_metapats: LinkedHashMap<i32, MetaPattern> = LinkedHashMap::new();
@@ -158,7 +157,7 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, m
 
     println!("STRIDES: {:?}", strides);
 
-    let occurrences = strides
+    let mut occurrences = strides
         .iter()
         .into_group_map_by(|x| **x)
         .into_iter()
@@ -192,25 +191,23 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, m
 
     println!("Mat = {:?}", expl_matrix);
 
-    let mut max_n: i64;
-    let mut new_max_n: i64;
-    // Most repeated pattern first (MRPF)
-    'pat_for: for ((row,col), reps) in occurrences.iter() {
-        max_n = check_metapattern_reps(&expl_matrix, (*row as usize,*col as usize), &(*reps as i32,*row,*col)) as i64;
-        new_max_n = max_n - 1;
+    'outer: loop {
+        // Most repeated pattern first (MRPF)
+        'inner: for ((row,col), reps) in occurrences.iter_mut() {
+            
+            println!("(row = {}, col = {}, reps = {})", *row, *col, *reps);
 
-        loop {
-            if new_max_n <= 0 {
-                break 'pat_for;
-            }
-
-            if new_max_n == max_n {
-                break 'pat_for;
-            }
-
-            max_n = new_max_n;
-            new_max_n = check_metapattern_reps(&expl_matrix, (*row as usize,*col as usize), &(max_n as i32,*row,*col)) as i64;
+            // let result: Option<Piece> = check_metapattern_reps(&self.value_matrix, (row,col), pattern);
+            
+            // loop {
+            //     max_n = new_max_n;
+            //     new_max_n = check_metapattern_reps(&expl_matrix, (*row as usize,*col as usize), &(max_n as i32,*row,*col)) as i64;
+            // }
         }
+
+
+
+        break;
     }
     // Begin strided search
 
@@ -225,61 +222,29 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, max_stride: usize, m
 
 #[inline(always)]
 #[allow(dead_code)]
-fn check_metapattern_reps(csmat: &CsMat<bool>, curr_pos: (usize, usize), pattern: &Pattern) -> usize {
-    let &(n,i,j) = pattern;
+fn check_metapattern_reps(csmat: &CsMat<bool>, curr_pos: (usize, usize), pattern: &Pattern) -> Option<Piece> {
+    let &(max_n,i,j) = pattern;
     let (x,y) = curr_pos;
-
-    // println!("{:?}", (x,y,n,i,j));
 
     // Discard already dumped patterns without computing bounds first
     if *csmat.get(x,y).unwrap() {
-        return 0;
+        return None;
     }
 
-    let max_pos_x = x as i64 + (n-1) as i64 * i as i64;
-    let max_pos_y = y as i64 + (n-1) as i64 * j as i64;
-
-    // Discard out-of-bounds patterns
-    if max_pos_x < 0 || max_pos_x >= csmat.rows() as i64 || max_pos_y < 0 || max_pos_y >= csmat.cols() as i64 {
-        let max_nreps_rows;
-        if i == 0 {
-            max_nreps_rows = std::i64::MAX;
-        } else {
-            let l_max_nreps_rows = csmat.rows() as i64 + i as i64/2i64;
-            let l_max_nreps_rows = l_max_nreps_rows - (l_max_nreps_rows%i as i64);
-            let l_max_nreps_rows = l_max_nreps_rows / i as i64;
-            max_nreps_rows = l_max_nreps_rows;
-        }
-
-        let max_nreps_cols;
-        if j == 0 {
-            max_nreps_cols = std::i64::MAX;
-        } else {
-            let l_max_nreps_cols = csmat.cols() as i64 + j as i64/2i64;
-            let l_max_nreps_cols = l_max_nreps_cols - (l_max_nreps_cols%j as i64);
-            let l_max_nreps_cols = l_max_nreps_cols / j as i64;
-            max_nreps_cols = l_max_nreps_cols;
-        }
-
-        println!("{} Max reps: rows = {}, cols = {}. Csmat rows = {}, cols = {}. Stride i = {}, j = {}", "[MP_REPS]".purple().bold() ,max_nreps_rows, max_nreps_cols, csmat.rows(), csmat.cols(), i, j);
-
-        return std::cmp::min(max_nreps_rows, max_nreps_cols) as usize;
-    }
-
-    // We can start on the next pattern
-    for ii in 1..n {
+    // We can start on the next pattern (length would be 2 if only the first iteration completes)
+    for ii in 1..max_n {
         let position = csmat.get((x as i64 + (i as i64 * ii as i64)) as usize, (y as i64 + (j as i64 * ii as i64)) as usize);
         match position {
             Some(&is_in_pat) => {
                 if is_in_pat {
-                    return ii as usize;
+                    return Some((x,y,(ii,i,j)));
                 } else {
                     continue;
                 }
             },
-            None    => return ii as usize,
+            None => return Some((x,y,(ii,i,j))),
         }
     }
 
-    return n as usize;
+    return Some((x,y,(max_n,i,j)));
 }

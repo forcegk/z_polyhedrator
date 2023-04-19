@@ -4,9 +4,9 @@ extern crate text_io;
 use std::{path::PathBuf, process::exit};
 use colored::Colorize;
 
-mod spsearx;
+mod spsearch;
 #[allow(unused_imports)]
-use crate::spsearx::{SpSearxMatrix,SpSearxPatternsFlags};
+use crate::spsearch::{SpSearchMatrix,SpSearchPatternsFlags};
 
 mod spaugment;
 #[allow(unused_imports)]
@@ -58,19 +58,19 @@ fn main() {
     };
 
     let search_flags = {
-        let mut l_search_flags = spsearx::SpSearxPatternsFlags::NoFlags;
+        let mut l_search_flags = spsearch::SpSearchPatternsFlags::NoFlags;
 
         if flags.search_flags.is_some() {
             match flags.search_flags.unwrap().as_str() {
-                "PatternFirst" => l_search_flags |= spsearx::SpSearxPatternsFlags::PatternFirst,
-                "CellFirst" => l_search_flags |= spsearx::SpSearxPatternsFlags::CellFirst,
+                "PatternFirst" => l_search_flags |= spsearch::SpSearchPatternsFlags::PatternFirst,
+                "CellFirst" => l_search_flags |= spsearch::SpSearchPatternsFlags::CellFirst,
                 def => {
                     eprintln!("invalid value `{}` for `--search-flags`. Valid options: {{[PatternFirst], CellFirst}} where [] = default.", def);
                     exit(-1);
                 }
             }
         } else {
-            l_search_flags |= spsearx::SpSearxPatternsFlags::PatternFirst;
+            l_search_flags |= spsearch::SpSearchPatternsFlags::PatternFirst;
         }
 
         l_search_flags
@@ -78,7 +78,7 @@ fn main() {
 
     /* -------- PARSE -------- */
     eprintln!("{} Opening matrixmarket file: {}", "[INFO]".cyan().bold(), matrixmarket_file_path);
-    let mut base_matrix: SpSearxMatrix = SpSearxMatrix::from_file(matrixmarket_file_path);
+    let mut base_matrix: SpSearchMatrix = SpSearchMatrix::from_file(matrixmarket_file_path);
     
     eprintln!("{} Opening patterns file: {}", "[INFO]".cyan().bold(), patterns_file_path);
     base_matrix.load_patterns(patterns_file_path);
