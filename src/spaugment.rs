@@ -268,13 +268,14 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
 
 #[inline(always)]
 #[allow(dead_code)]
-fn check_metapattern_reps(csmat: &CsMat<bool>, curr_pos: (usize, usize), pattern: &Pattern) -> Option<Piece> {
+fn check_metapattern_reps(csmat: &CsMat<bool>, curr_pos: (usize, usize), pattern: &Pattern) -> Piece {
     let &(max_n,i,j) = pattern;
     let (x,y) = curr_pos;
 
     // Discard already dumped patterns without computing bounds first
     if *csmat.get(x,y).unwrap() {
-        return None;
+        // Could be all zeros, important thing is that N = 0
+        return (x,y,(0,i,j));
     }
 
     // We can start on the next pattern (length would be 2 if only the first iteration completes)
@@ -283,14 +284,14 @@ fn check_metapattern_reps(csmat: &CsMat<bool>, curr_pos: (usize, usize), pattern
         match position {
             Some(&is_in_pat) => {
                 if is_in_pat {
-                    return Some((x,y,(ii,i,j)));
+                    return (x,y,(ii,i,j));
                 } else {
                     continue;
                 }
             },
-            None => return Some((x,y,(ii,i,j))),
+            None => return (x,y,(ii,i,j)),
         }
     }
 
-    return Some((x,y,(max_n,i,j)));
+    return (x,y,(max_n,i,j));
 }
