@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use std::time::Instant;
 
 use colored::Colorize;
-use itertools::Itertools;
+use itertools::{Itertools, enumerate};
 use linked_hash_map::LinkedHashMap;
 use sprs::CsMat;
 
@@ -141,8 +141,10 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
 
     println!("Metapatterns: {:?}", origins_list);
 
+    let origin_list_len = origins_list.len();
+
     // No feasible higher order metapatterns
-    if origins_list.len() <= 1 {
+    if origin_list_len <= 1 {
         return None;
     }
 
@@ -201,68 +203,68 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
 
     let fn_best_piece = |p1:Piece,p2:Piece| std::cmp::max_by_key(p1, p2, |(_,_,(n,_,_))| *n);
 
-    'outer: loop {
-        // println!("(row = {}, col = {}, reps = {})", *row, *col, *reps);
-        
-        // Most repeated pattern first (MRPF)
-        let mut occ_it_peekable = occurrences.iter_mut().peekable();
-        'inner: for ((offset_x,offset_y), reps) in occ_it_peekable {
-            let mut found: bool = false;
-            let mut best_piece: Piece = (0,0,(0,0,0));
+    let mut best_piece: Piece = (0,0,(0,0,0));
+    let mut found_piece: bool = false;
+    // let origin_list_len (from previously)
 
-            // Continue to keep searching. Break to accept best_piece.
-            'innermost: for (value, (expl_row,expl_col)) in expl_matrix.iter() {
-                
-                    let result: Option<Piece> = check_metapattern_reps(&expl_matrix, (expl_row, expl_col), &(*reps as i32, *offset_x, *offset_y));
-                    match result {
-                        None => continue,
-                        Some((x,y,(n,i,j))) => {
-                            // Update best piece if needed
-                            best_piece = fn_best_piece(best_piece, (expl_row, expl_col, (n, *offset_x, *offset_y)));
-                            
-                            // Check if we need to keep searching
-                            if n < *reps as i32 {
-                                match occ_it_peekable.peek() {
-                                    Some(((next_offset_x,next_offset_y), next_reps)) => {
-                                        if n < **next_reps as i32 {
-                                            // continue searching
-                                            continue 'innermost;
-                                        }
-                                    },
-                                    None => break 'innermost, // this is the last one so commit with whatever we have
-                                }
-                            }
-
-
-
-                            
-                        },
-                    }
-            }
-
+    'L1: loop {
+        if found_piece {
+            // Reorder LHM (TODO)
         }
 
-        // reorder occurrences
+        // Reset best_piece
+        best_piece = (0,0,(0,0,0));
 
+        'L2: for (((stride_x, stride_y), n), ((_, _), next_n)) in occurrences.iter().circular_tuple_windows::<((&(i32, i32), &u32), (&(i32, i32), &u32))>() {
+            // println!("  -> Comparing {:?}", occ);
 
+            // Most repeated pattern first (MRPF)
+            'L3: for (idx, (_,(e_row, e_col))) in enumerate(expl_matrix.iter()){
+                best_piece = fn_best_piece(check_metapattern_reps(&expl_matrix, (e_row,e_col), &(*n as i32,*stride_x,*stride_y)), best_piece);
 
-            // let result: Option<Piece> = check_metapattern_reps(&expl_matrix, (*row as usize, *col as usize), pattern);
-            
-            // loop {
-                //     max_n = new_max_n;
-                //     new_max_n = check_metapattern_reps(&expl_matrix, (*row as usize,*col as usize), &(max_n as i32,*row,*col)) as i64;
-                // }
+                // si bp.n >= next_n        or         there are no remaining points to build a piece
+                if best_piece.2.0 as u32 >= *next_n || best_piece.2.0 as usize >= origin_list_len-(idx as usize)-1 {
+                    break 'L3;
+                }
+            } // 'L3
 
-        break;
+            if best_piece.2.0 > 0 {
+                /*** APPEND ROUTINE ***/
+                // Get suitable pattern id
+                let pat_id: i32 = match MetaPatternList.back() {
+                    Some((id,((v_n, v_i, v_j), _, _))) => {
+                        if *v_n == best_piece.2.0 && *v_i == best_piece.2.1 && *v_j == best_piece.2.2 {
+                            *id
+                        } else {
+                            (*id)+1
+                        }
+                    },
+                    None => 0,
+                };
+
+                // Insert into metapattern list     n,i,j from best piece.
+                // If they are equal then nothing changes and we save an if statement (2Bbenchmarkd)
+                MetaPatternList.insert(pat_id, (best_piece.2, 0, None));
+                //                                                 ^  ^^^^  TO BE RENAMED AND REORDERED
+
+                // Insert piece intro metapattern piece list
+                MetaPatternPieceList.insert((best_piece.0, best_piece.1), pat_id);
+
+                // Set flag for reordering occurrence list
+                found_piece = true;
+                break 'L2;
+            }
+        } // 'L2
+
+        if !found_piece {
+            break 'L1;
+        }
     }
-    // Begin strided search
 
-
+    println!("{}: MetaPatternList = {:?}", "[DEBUG]".cyan().bold(), MetaPatternList);
+    println!("{}: MetaPatternPieceList = {:?}", "[DEBUG]".cyan().bold(), MetaPatternPieceList);
 
     None // TODO FIX
-
-
-
 
 }
 
