@@ -7,7 +7,7 @@ use itertools::{Itertools, enumerate};
 use linked_hash_map::LinkedHashMap;
 use sprs::CsMat;
 
-use crate::utils::{Pattern,Piece,Uwc,OriginUwc};
+use crate::utils::{Pattern,Piece,Uwc,OriginUwc, pause};
 use crate::utils::orig_uwc_to_piece_1d;
 
 //                    N    I    J    Order  Sub-Pattern
@@ -203,32 +203,72 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
 
     let fn_best_piece = |p1:Piece,p2:Piece| std::cmp::max_by_key(p1, p2, |(_,_,(n,_,_))| *n);
 
-    let mut best_piece: Piece = (0,0,(0,0,0));
+    let mut best_piece: Piece = (0,0,(1,0,0));
     let mut found_piece: bool = false;
+    let mut end_l3: bool = true;
     // let origin_list_len (from previously)
 
     'L1: loop {
         if found_piece {
-            // Reorder LHM (TODO)
+            /*** REORDER LHM ***/
+            let (x,y,(n,i,j)) = best_piece;
+            let remainder;
+            {// scoped so it does not interfere
+                let p = occurrences.get_mut(&(i,j)).unwrap();
+                remainder = *p - (n as u32 -1);
+                *p = remainder;
+            }
+
+            // Send updated entry to the back of the LHM
+            occurrences.get_refresh(&(i,j));
+
+            // Push back every other occurrence with less occurring times
+            let pushback_pos = occurrences
+                .iter()
+                .filter(|(_, reps)| **reps <= remainder)
+                .map(|(k,_)| *k)
+                .collect::<Vec<(i32, i32)>>();
+
+            for pos in pushback_pos {
+                occurrences.get_refresh(&pos);
+            }
+
+            // Set to false members of the new pattern
+            for ii in 0..n {
+                let pos_val = expl_matrix.get_mut((x as i64 + (i as i64 * ii as i64)) as usize, (y as i64 + (j as i64 * ii as i64)) as usize).unwrap();
+                *pos_val = true;
+            }
+
+            // println!("Occurrences: {:?}", occurrences);
         }
 
+        // pause();
+
         // Reset best_piece
-        best_piece = (0,0,(0,0,0));
+        best_piece = (0,0,(1,0,0));
+        found_piece = false;
 
         'L2: for (((stride_x, stride_y), n), ((_, _), next_n)) in occurrences.iter().circular_tuple_windows::<((&(i32, i32), &u32), (&(i32, i32), &u32))>() {
-            // println!("  -> Comparing {:?}", occ);
+            // println!("  -> Comparing {:?} vs {:?}", n, next_n);
 
+            // end_l3 = true;
             // Most repeated pattern first (MRPF)
             'L3: for (idx, (_,(e_row, e_col))) in enumerate(expl_matrix.iter()){
-                best_piece = fn_best_piece(check_metapattern_reps(&expl_matrix, (e_row,e_col), &(*n as i32,*stride_x,*stride_y)), best_piece);
+                best_piece = fn_best_piece(check_metapattern_reps(&expl_matrix, (e_row,e_col), &(*n as i32 + 1,*stride_x,*stride_y)), best_piece);
 
                 // si bp.n >= next_n        or         there are no remaining points to build a piece
-                if best_piece.2.0 as u32 >= *next_n || best_piece.2.0 as usize >= origin_list_len-(idx as usize)-1 {
+                if best_piece.2.0 as u32 >= *next_n+1 || best_piece.2.0 as usize >= origin_list_len-(idx as usize)-1 {
+                    // end_l3 = false;
                     break 'L3;
                 }
             } // 'L3
 
-            if best_piece.2.0 > 0 {
+            // if end_l3 {
+            //     println!("Enter");
+            //     continue 'L2;
+            // }
+
+            if best_piece.2.0 > 1 {
                 /*** APPEND ROUTINE ***/
                 // Get suitable pattern id
                 let pat_id: i32 = match MetaPatternList.back() {
@@ -250,6 +290,7 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
                 // Insert piece intro metapattern piece list
                 MetaPatternPieceList.insert((best_piece.0, best_piece.1), pat_id);
 
+                println!("  -> Found piece! {:?}", best_piece);
                 // Set flag for reordering occurrence list
                 found_piece = true;
                 break 'L2;

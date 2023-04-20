@@ -4,6 +4,9 @@ use stringreader::StringReader;
 use std::{io::BufReader, process::{Command, Stdio}};
 use colored::Colorize;
 
+use std::io;
+use std::io::prelude::*;
+
 /* COMMON TYPES */
 pub type Pattern = (i32, i32, i32);
 pub type Piece = (usize, usize, Pattern);
@@ -43,6 +46,20 @@ pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str) -> CsMat<T> {
         }
     };
     return value_matrix;
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub fn pause() {
+    let mut stdin = std::io::stdin();
+    let mut stdout = std::io::stdout();
+
+    // Lock the line and manually flush
+    write!(stdout, "Press any key to continue...").unwrap();
+    stdout.flush().unwrap();
+
+    // Read byte and discard
+    let _ = stdin.read(&mut [0u8]).unwrap();
 }
 
 #[inline(always)]
