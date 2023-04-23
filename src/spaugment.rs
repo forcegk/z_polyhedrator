@@ -167,31 +167,18 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
 
     println!("STRIDES: {:?}", strides);
 
+    // TODO sort same occurrence count items by distance.
+
     let mut occurrences = strides
         .iter()
         .into_group_map_by(|x| **x)
         .into_iter()
         .map(|(k,v)| (k, v.len() as u32))
-        .sorted_by_key(|(_,reps)| std::cmp::Reverse(*reps))
+        //                                                                                       solve tie on equal reps by prioritizing closer pieces. i64 to avoid OF
+        .sorted_by_key(|((stride_x, stride_y),reps)| std::cmp::Reverse((*reps , ( -((*stride_x) as i64 * (*stride_x) as i64) ) as i64 - ((*stride_y) as i64 *(*stride_y) as i64) as i64 )))
         .collect::<LinkedHashMap<(i32,i32),u32>>();
 
     println!("OCCURRENCES: {:?}", occurrences);
-
-    // let mut basepat: usize = 0;
-    // loop {
-    //     if origins_list.get(basepat).is_none() { break; }
-
-    //     // // Normalize distances to first pattern
-    //     // let base = *origins_list.get(basepat).unwrap();
-    //     // for origin in origins_list.iter_mut() {
-    //     //     *origin = fn_tuple_sub (*origin, base);
-    //     // }
-    //     // println!("Normalized for #{}: {:?}", basepat, origins_list);
-
-    //     basepat += 1;
-    // }
-
-    // let mut value_matrix = CsMat::empty(f64_value_matrix.storage(), f64_value_matrix.inner_dims());
 
     // Compose sparse matrix with origins_list
     let mut expl_matrix: CsMat<bool> = CsMat::zero((max_row as usize, max_col as usize));
@@ -209,7 +196,7 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
 
     'L1: loop {
         if found_piece {
-            /*** REORDER LHM ***/
+            /*** FIX OCCURRENCES IN LHM ***/
             let (x,y,(n,i,j)) = best_piece;
             let remainder;
             {// scoped so it does not interfere
@@ -218,30 +205,14 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
                 *p = remainder;
             }
 
-            // Send updated entry to the back of the LHM
-            occurrences.get_refresh(&(i,j));
-
-            // Push back every other occurrence with less occurring times
-            let pushback_pos = occurrences
-                .iter()
-                .filter(|(_, reps)| **reps <= remainder)
-                .map(|(k,_)| *k)
-                .collect::<Vec<(i32, i32)>>();
-
-            for pos in pushback_pos {
-                occurrences.get_refresh(&pos);
-            }
-
-            // Set to false members of the new pattern
+            // Set to found (true) members of the new pattern
             for ii in 0..n {
                 let pos_val = expl_matrix.get_mut((x as i64 + (i as i64 * ii as i64)) as usize, (y as i64 + (j as i64 * ii as i64)) as usize).unwrap();
                 *pos_val = true;
             }
-
-            // println!("Occurrences: {:?}", occurrences);
         }
 
-        // Reset best_piece
+        // Reset best_piece and found_piece
         best_piece = (0,0,(1,0,0));
         found_piece = false;
 
@@ -252,7 +223,14 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
             'L3: for (idx, (_,(e_row, e_col))) in enumerate(expl_matrix.iter()){
                 best_piece = fn_best_piece(check_metapattern_reps(&expl_matrix, (e_row,e_col), &(*n as i32 + 1,*stride_x,*stride_y)), best_piece);
 
-                // si bp.n >= next_n        or         there are no remaining points to build a piece
+                // This is equal to the piece of code above. TODO check speed difference.
+                // let curr_piece = check_metapattern_reps(&expl_matrix, (e_row,e_col), &(*n as i32 + 1,*stride_x,*stride_y));
+                // if curr_piece.2.0 > best_piece.2.0 {
+                //     best_piece = curr_piece;
+                // }
+
+                // FIXME check this now that no LHM reordering is being done
+                // if bp.n >= next_n        or         there are no remaining points to build a piece
                 if best_piece.2.0 as u32 >= *next_n+1 || best_piece.2.0 as usize >= origin_list_len-(idx as usize)-1 {
                     break 'L3;
                 }
