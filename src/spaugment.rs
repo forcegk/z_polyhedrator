@@ -205,7 +205,6 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
 
     let mut best_piece: Piece = (0,0,(1,0,0));
     let mut found_piece: bool = false;
-    let mut end_l3: bool = true;
     // let origin_list_len (from previously)
 
     'L1: loop {
@@ -242,8 +241,6 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
             // println!("Occurrences: {:?}", occurrences);
         }
 
-        // pause();
-
         // Reset best_piece
         best_piece = (0,0,(1,0,0));
         found_piece = false;
@@ -251,22 +248,15 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
         'L2: for (((stride_x, stride_y), n), ((_, _), next_n)) in occurrences.iter().circular_tuple_windows::<((&(i32, i32), &u32), (&(i32, i32), &u32))>() {
             // println!("  -> Comparing {:?} vs {:?}", n, next_n);
 
-            // end_l3 = true;
             // Most repeated pattern first (MRPF)
             'L3: for (idx, (_,(e_row, e_col))) in enumerate(expl_matrix.iter()){
                 best_piece = fn_best_piece(check_metapattern_reps(&expl_matrix, (e_row,e_col), &(*n as i32 + 1,*stride_x,*stride_y)), best_piece);
 
                 // si bp.n >= next_n        or         there are no remaining points to build a piece
                 if best_piece.2.0 as u32 >= *next_n+1 || best_piece.2.0 as usize >= origin_list_len-(idx as usize)-1 {
-                    // end_l3 = false;
                     break 'L3;
                 }
             } // 'L3
-
-            // if end_l3 {
-            //     println!("Enter");
-            //     continue 'L2;
-            // }
 
             if best_piece.2.0 > 1 {
                 /*** APPEND ROUTINE ***/
