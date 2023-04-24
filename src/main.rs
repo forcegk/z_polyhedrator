@@ -43,6 +43,9 @@ fn main() {
 
         /// Augment dimensionality
         optional -a, --augment-dimensionality augment_dimensionality: usize
+
+        /// Minimum piece length for dimensionality augmentation
+        optional -pl, --augmen-dimensionality-piece-cutoff augment_dimensionality_piece_cutoff: usize
     };
 
     let patterns_file_path = flags.patterns_file_path.to_str().unwrap();
@@ -95,19 +98,18 @@ fn main() {
         base_matrix.print_pieces();
     }
 
-    let augment_dimensionality: usize = {
-        if flags.augment_dimensionality.is_some() {
-            flags.augment_dimensionality.unwrap()
-        } else {
-            1usize
-        }
+    let augment_dimensionality: usize = match flags.augment_dimensionality {
+        Some(x) => x,
+        None => 1usize,
     };
 
-    if augment_dimensionality > 1 {
-        // Augment dimensionality
-    }
+    let augment_dimensionality_piece_cutoff: usize = match flags.augmen_dimensionality_piece_cutoff {
+        Some(x) => x,
+        None => 2usize,
+    };
 
-    if flags.print_uwc_list || output_spf_file_path.0 {
+
+    if flags.print_uwc_list || output_spf_file_path.0 || augment_dimensionality > 1 {
         let spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list(), base_matrix.numrows, base_matrix.numcols, base_matrix.nonzeros);
 
         // Already done before
@@ -120,12 +122,18 @@ fn main() {
             spfgen.print_distinct_uwc_list(true);
         }
 
+        let mut spaugment;
+        if augment_dimensionality > 1 {
+            // Augment dimensionality
+            spaugment = SpAugment::from_1d_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
+            spaugment.augment_dimensionality(augment_dimensionality, augment_dimensionality_piece_cutoff);
+        }
+
+        // TODO send back augmentated model to spfgen. Implement new dump logic.
+
         if output_spf_file_path.0 {
             spfgen.write_spf(matrixmarket_file_path, output_spf_file_path.1.as_str());
         }
 
-        let mut spaugment = SpAugment::from_1d_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
-
-        spaugment.augment_dimensionality(2);
     }
 }
