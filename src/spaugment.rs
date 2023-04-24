@@ -42,8 +42,6 @@ impl SpAugment {
             })
             .collect::<LinkedHashMap<MetaPatternPiece, i32>>();
 
-        println!("MP_Pieces:\n{:?}", meta_pattern_pieces);
-
         // NOTE HERE! The key -1 does not have to be in this list! It is only included on the distinct patterns list from spfgen temporarily, but it is NOT necessary.
         let mut meta_patterns: LinkedHashMap<i32, MetaPattern> = LinkedHashMap::new();
         for ((_,_,(n,i,j)), id) in origin_uwc_list.iter().map(|(ouwc, id)| (orig_uwc_to_piece_1d(ouwc), id)) {
@@ -53,6 +51,7 @@ impl SpAugment {
             }
         };
 
+        println!("MP_Pieces:\n{:?}", meta_pattern_pieces);
         println!("MP_Dict:\n{:?}\nLen: {}", meta_patterns, meta_patterns.len());
 
         SpAugment { 
@@ -66,24 +65,19 @@ impl SpAugment {
     }
 
     pub fn augment_dimensionality(&mut self, target_dim: i32) {
-        let single_compensation: i32 = match self.meta_patterns.get(&-1) {
-            Some(_) => -1i32,
-            None => 0i32
-        };
 
         println!("\n------- AUGMENT DIMENSIONALITY -------\n");
 
-        println!("Compensation {} (this accounts for elements with id=-1)", single_compensation);
-
-        let mut start_ptr: usize = 0;
-        let mut end_ptr: usize = 0;
+        let single_compensation: i64 = match self.meta_patterns.get(&-1) {
+            Some(_) => -1i64,
+            None => 0i64
+        };
+        println!("Compensation = {} (this accounts for elements with id=-1)", single_compensation);
 
         // PRECONDITION: Metapatterns are not necessarily ordered, but same metapatterns are consecutive in the list
 
         // FIXME Maybe generalize this to support any-dimensional input
         for curr_dim in 2..=target_dim {
-            // Set ptr to current dimensionality
-            start_ptr = end_ptr;
             println!("Searching for {}D", curr_dim);
 
             // Aux variables for processing
@@ -92,13 +86,15 @@ impl SpAugment {
             
             // Advance pointer to current dimensionality pieces
             let mut metapat_pieces_iter = self.meta_pattern_pieces.iter()
-                .filter(|(_,id)| **id != -1)
-                .skip(start_ptr);
+                .filter(|(_,id)| **id != -1);
 
-            let mut new_metapat_pieces: LinkedHashMap<MetaPatternPiece, i32> = LinkedHashMap::new();
+            let mut start_id = (self.meta_patterns.len() as i64 + single_compensation) as i32;
+            let curr_dim_start_id = start_id;
+
             let mut new_metapats: LinkedHashMap<i32, MetaPattern> = LinkedHashMap::new();
+            let mut new_metapat_pieces: LinkedHashMap<MetaPatternPiece, i32> = LinkedHashMap::new();
 
-            // This loop loads all consecutive metapatterns with the same id into origins_list, the executes the "if opt.is_none() [...]"
+            // This loop loads all consecutive metapatterns with the same id into origins_list, then executes the "if opt.is_none() [...]"
             loop {
                 let opt = metapat_pieces_iter.next();
                 
@@ -107,7 +103,17 @@ impl SpAugment {
                     println!("\n------- compute_metapatterns for id = {} -------", curr_id);
 
                     // Compute metapatterns FIXME parametrize max and min strides
-                    compute_metapatterns(&mut origins_list);
+                    match compute_metapatterns(&mut origins_list, start_id, curr_id) {
+                        Some((l_new_metapats, l_new_metapat_pieces)) => {
+                            println!("Found!");
+                            start_id += l_new_metapats.len() as i32;
+
+                            // Extend new metapats
+                            new_metapats.extend(l_new_metapats);
+                            new_metapat_pieces.extend(l_new_metapat_pieces);
+                        },
+                        None => println!("No new metapatterns"),
+                    }
 
                     // And prepare for next batch
                     origins_list.clear();
@@ -123,21 +129,54 @@ impl SpAugment {
                 // Append consecutive same-id metapattern pieces to origins_list
                 let ((x,y),_) = opt.unwrap();
                 origins_list.push((*x as i32, *y as i32));
-
-                start_ptr += 1;
             }
 
-            println!("Startptr: {:?}. Curr_id: {:?}", start_ptr, curr_id);
+            println!("Startptr: --. Curr_id: {:?}", curr_id);
 
-            // TODO Add new_metapat_pieces and new_metapats to current ones
-            
-        }
+            // Add new_metapat_pieces and new_metapats to current ones
+            let new_metapats_len = new_metapats.len() as i32;
+            self.meta_patterns.extend(new_metapats);
+            self.meta_pattern_pieces.extend(new_metapat_pieces);
+
+            // In the case of the metapattern pieces, this is a little bit more troublesome, as we have to invalidate
+            // last-d pieces contained in higher order pieces.
+            // As we are traversing high order pieces, we now rewrite *order* value.
+            let pieces = self.meta_pattern_pieces.iter()
+                .filter(|(_,val)| (**val >= curr_dim_start_id) && (**val < (curr_dim_start_id+new_metapats_len)))
+                .map(|((x,y),id)| ((*x,*y), *id))
+                .collect::<Vec<_>>();
+
+            println!(" ------ INVALIDATE AND UPDATE ORDER ------ ");
+            for ((orig_x, orig_y), low_order_id) in pieces {
+                println!(" - {:?}: {}", (orig_x, orig_y), low_order_id);
+
+                // get pattern
+                let mp = self.meta_patterns.get(&low_order_id).unwrap();
+
+                let (n,i,j) = mp.0;
+
+                // Update dimensionality of current metapattern
+                self.meta_patterns.get_mut(&low_order_id).unwrap().1 = curr_dim;
+
+                // Skip the first one as it is already updated (hashmap propierties)
+                for ii in 1..n {
+                    self.meta_pattern_pieces.remove(
+                        &((orig_x as i64 + (i as i64 * ii as i64)) as usize, (orig_y as i64 + (j as i64 * ii as i64)) as usize)
+                    );
+                }
+            }
+
+            println!("for loop going from [{} to {})", curr_dim_start_id, curr_dim_start_id + new_metapats_len);
+            println!("MP_Pieces:\n{:?}", self.meta_pattern_pieces);
+            println!("MP_Dict:\n{:?}\nLen: {}", self.meta_patterns, self.meta_patterns.len());
+
+        } // for dims
     }
 }
 
 #[inline(always)]
 #[allow(dead_code)]
-fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHashMap<i32, MetaPattern>, LinkedHashMap<MetaPatternPiece, i32>)> {
+fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, start_id: i32, low_order_id: i32) -> Option<(LinkedHashMap<i32, MetaPattern>, LinkedHashMap<MetaPatternPiece, i32>)> {
 
     println!("Metapatterns: {:?}", origins_list);
 
@@ -167,8 +206,6 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
 
     println!("STRIDES: {:?}", strides);
 
-    // TODO sort same occurrence count items by distance.
-
     let mut occurrences = strides
         .iter()
         .into_group_map_by(|x| **x)
@@ -187,8 +224,6 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
     }
 
     println!("Mat = {:?}", expl_matrix);
-
-    let fn_best_piece = |p1:Piece,p2:Piece| std::cmp::max_by_key(p1, p2, |(_,_,(n,_,_))| *n);
 
     let mut best_piece: Piece = (0,0,(1,0,0));
     let mut found_piece: bool = false;
@@ -221,7 +256,7 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
 
             // Most repeated pattern first (MRPF)
             'L3: for (idx, (_,(e_row, e_col))) in enumerate(expl_matrix.iter()){
-                best_piece = fn_best_piece(check_metapattern_reps(&expl_matrix, (e_row,e_col), &(*n as i32 + 1,*stride_x,*stride_y)), best_piece);
+                best_piece = (|p1:Piece,p2:Piece| std::cmp::max_by_key(p1, p2, |(_,_,(n,_,_))| *n)) (check_metapattern_reps(&expl_matrix, (e_row,e_col), &(*n as i32 + 1,*stride_x,*stride_y)), best_piece);
 
                 // This is equal to the piece of code above. TODO check speed difference.
                 // let curr_piece = check_metapattern_reps(&expl_matrix, (e_row,e_col), &(*n as i32 + 1,*stride_x,*stride_y));
@@ -247,13 +282,13 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
                             (*id)+1
                         }
                     },
-                    None => 0,
+                    None => start_id,
                 };
 
                 // Insert into metapattern list     n,i,j from best piece.
                 // If they are equal then nothing changes and we save an if statement (2Bbenchmarkd)
-                MetaPatternList.insert(pat_id, (best_piece.2, 0, None));
-                //                                                 ^  ^^^^  TO BE RENAMED AND REORDERED
+                MetaPatternList.insert(pat_id, (best_piece.2, 0, Some(low_order_id)));
+                //                                                ^^^ This has to be replaced out of this function
 
                 // Insert piece intro metapattern piece list
                 MetaPatternPieceList.insert((best_piece.0, best_piece.1), pat_id);
@@ -273,8 +308,11 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>) -> Option<(LinkedHas
     println!("{}: MetaPatternList = {:?}", "[DEBUG]".cyan().bold(), MetaPatternList);
     println!("{}: MetaPatternPieceList = {:?}", "[DEBUG]".cyan().bold(), MetaPatternPieceList);
 
-    None // TODO FIX
-
+    if MetaPatternList.len() > 0 {
+        return Some((MetaPatternList, MetaPatternPieceList));
+    } else {
+        return None;
+    }
 }
 
 #[inline(always)]

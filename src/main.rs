@@ -126,6 +126,6 @@ fn main() {
 
         let mut spaugment = SpAugment::from_1d_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
 
-        spaugment.augment_dimensionality(2);
+        spaugment.augment_dimensionality(4);
     }
 }
