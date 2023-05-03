@@ -91,46 +91,48 @@ impl SPFGen {
     #[allow(dead_code)]
     pub fn print_ast_list(&self) {
         println!("AST_List:\nRow\tCol\tN\tI\tJ");
-        // FIXME
-        // self.ast_list.iter().for_each(|(row, col, (n, i, j))| {
-        //     println!("{}\t{}\t{}\t{}\t{}", row, col, n, i, j);
-        // });
+        self.meta_pattern_pieces.iter().for_each(|((row, col), id)| {
+            println!("{}\t{}\t{}", row, col, id);
+        });
     }
 
     pub fn print_uwc_list(&self, show_eqs: bool) {
         println!("Uwc List:\nid\tU\t\tw\tc");
-        // FIXME
-        // self.uwc_list.iter().for_each(|((u,w,c), id)| {
-        //     print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(u, w) } else { "\n".to_string() } });
-        // });
+        self.meta_pattern_pieces.iter().for_each(|(_, id)| {
+            let (u,w,c) = pattern_to_uwc(&self.meta_patterns.get(id).unwrap().0);
+            print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(&u, &w) } else { "\n".to_string() } });
+        });
     }
 
     pub fn print_distinct_uwc_list(&self, show_eqs: bool) {
         println!("Distinct Uwc List:\nid\tU\t\tw\tc");
-        // FIXME
-        // self.distinct_uwc.iter().for_each(|((u,w,c), id)| {
-        //     print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(u, w) } else { "\n".to_string() } });
-        // });
+        self.meta_patterns.iter().for_each(|(id, (pattern,_,_))| {
+            let (u,w,c) = pattern_to_uwc(pattern);
+            print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(&u, &w) } else { "\n".to_string() } });
+        });
     }
 
     #[allow(dead_code)]
     pub fn get_uwc_list(&self) -> Vec<(Uwc, i32)> {
         //self.uwc_list.clone()
         // FIXME
-        vec![]
+        self.meta_pattern_pieces
+            .iter()
+            .map(|(_, id)| {
+                let uwc = pattern_to_uwc(&self.meta_patterns.get(id).unwrap().0);
+                (uwc, *id)
+            })
+            .collect::<Vec<(Uwc, i32)>>()
     }
 
     pub fn get_orig_uwc_list(&self) -> Vec<(OriginUwc, i32)> {
-        let mut retvec: Vec<(OriginUwc, i32)> = vec![];
-
-        // FIXME
-        // for idx in 0..self.uwc_list.len() {
-        //     let (uwc, id) = self.uwc_list.get(idx).unwrap();
-        //     let (x,y, _) = self.ast_list.get(idx).unwrap();
-        //     retvec.push(((*x, *y, uwc.clone()), *id));
-        // }
-
-        retvec
+        self.meta_pattern_pieces
+            .iter()
+            .map(|((row,col), id)| {
+                let uwc = pattern_to_uwc(&self.meta_patterns.get(id).unwrap().0);
+                ((*row,*col,uwc), *id)
+            })
+            .collect::<Vec<(OriginUwc, i32)>>()
     }
 
     pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str) {
