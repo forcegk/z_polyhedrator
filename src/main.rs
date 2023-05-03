@@ -125,7 +125,7 @@ fn main() {
         let mut spaugment;
         if augment_dimensionality > 1 {
             // Augment dimensionality
-            spaugment = SpAugment::from_1d_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
+            spaugment = SpAugment::from_1d_origin_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
             spaugment.augment_dimensionality(augment_dimensionality, augment_dimensionality_piece_cutoff);
         }
 

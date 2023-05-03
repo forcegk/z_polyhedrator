@@ -5,7 +5,7 @@ use linked_hash_map::LinkedHashMap;
 use linked_hash_set::LinkedHashSet;
 use sprs::{CsMat, TriMat};
 
-use crate::utils::{Pattern,Piece,Uwc,OriginUwc};
+use crate::utils::{Pattern,Piece,Uwc,OriginUwc, MetaPattern, MetaPatternPiece};
 use crate::utils::{pattern_to_uwc,convex_hull_1d};
 
 pub struct SPFGen {
@@ -65,6 +65,12 @@ impl SPFGen {
             distinct_uwc
         };
     }
+
+    // pub fn from_metapatterns_list(meta_patterns: LinkedHashMap<i32, MetaPattern>, meta_pattern_pieces: LinkedHashMap<MetaPatternPiece, i32>) -> Self {
+
+
+    //     return SPFGen { ast_list: (), uwc_list: (), nrows: (), ncols: (), nnz: (), inc_nnz: (), distinct_patterns: (), distinct_uwc: () }
+    // }
 
     #[allow(dead_code)]
     pub fn print_ast_list(&self) {

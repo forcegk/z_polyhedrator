@@ -4,7 +4,6 @@ use stringreader::StringReader;
 use std::{io::BufReader, process::{Command, Stdio}};
 use colored::Colorize;
 
-use std::io;
 use std::io::prelude::*;
 
 /* COMMON TYPES */
@@ -12,6 +11,13 @@ pub type Pattern = (i32, i32, i32);
 pub type Piece = (usize, usize, Pattern);
 pub type Uwc = (Vec<Vec<i32>>, Vec<i32>, Vec<i32>);
 pub type OriginUwc = (usize, usize, Uwc);
+
+//                         N    I    J    Order  Sub-Pattern
+pub type MetaPattern = ( (i32, i32, i32),  i32,  Option<i32> );
+// If Option is None -> N,I,J describe the base pattern
+
+//                             X     Y
+pub type MetaPatternPiece = (usize,usize);
 
 pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str) -> CsMat<T> {
     let value_matrix: CsMat<T> = {

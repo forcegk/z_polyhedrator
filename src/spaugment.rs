@@ -3,18 +3,10 @@ use itertools::{Itertools, enumerate};
 use linked_hash_map::LinkedHashMap;
 use sprs::CsMat;
 
-use crate::utils::{Pattern,Piece,OriginUwc};
+use crate::utils::{Pattern,Piece,OriginUwc,MetaPattern,MetaPatternPiece};
 use crate::utils::orig_uwc_to_piece_1d;
 
-//                    N    I    J    Order  Sub-Pattern
-type MetaPattern = ((i32, i32, i32),  i32,  Option<i32> );
-// If Option is None -> N,I,J describe the base pattern
-
-//                         X     Y
-type MetaPatternPiece = (usize,usize);
-
 pub struct SpAugment {
-    origin_uwc_list: Vec<(OriginUwc, i32)>,
     pub nrows: usize,
     pub ncols: usize,
     pub nnz: usize,
@@ -23,7 +15,7 @@ pub struct SpAugment {
 }
 
 impl SpAugment {
-    pub fn from_1d_uwc_list(origin_uwc_list: Vec<(OriginUwc, i32)>, nrows: usize, ncols: usize, nnz: usize) -> Self {
+    pub fn from_1d_origin_uwc_list(origin_uwc_list: Vec<(OriginUwc, i32)>, nrows: usize, ncols: usize, nnz: usize) -> Self {
 
         // DEBUG UNCOMMENT
         // println!("Printing orig_uwc_list from spaugment!");
@@ -53,7 +45,6 @@ impl SpAugment {
         // println!("MP_Dict:\n{:?}\nLen: {}", meta_patterns, meta_patterns.len());
 
         SpAugment { 
-            origin_uwc_list: origin_uwc_list,
             nrows: nrows, 
             ncols: ncols,
             nnz: nnz,
@@ -193,8 +184,8 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
         return None;
     }
 
-    let mut MetaPatternList: LinkedHashMap<i32, MetaPattern> = LinkedHashMap::new();
-    let mut MetaPatternPieceList: LinkedHashMap<MetaPatternPiece, i32> = LinkedHashMap::new();
+    let mut meta_pattern_list: LinkedHashMap<i32, MetaPattern> = LinkedHashMap::new();
+    let mut meta_pattern_piece_list: LinkedHashMap<MetaPatternPiece, i32> = LinkedHashMap::new();
 
     let fn_tuple_sub = |(x1,y1):(i32,i32),(x2,y2):(i32,i32)| (x1-x2, y1-y2);
 
@@ -284,7 +275,7 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
             if best_piece.2.0 >= (piece_cutoff as i32) {
                 /*** APPEND ROUTINE ***/
                 // Get suitable pattern id
-                let pat_id: i32 = match MetaPatternList.back() {
+                let pat_id: i32 = match meta_pattern_list.back() {
                     Some((id,((v_n, v_i, v_j), _, _))) => {
                         if *v_n == best_piece.2.0 && *v_i == best_piece.2.1 && *v_j == best_piece.2.2 {
                             *id
@@ -297,11 +288,11 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
 
                 // Insert into metapattern list     n,i,j from best piece.
                 // If they are equal then nothing changes and we save an if statement (2Bbenchmarkd)
-                MetaPatternList.insert(pat_id, (best_piece.2, 0, Some(low_order_id)));
+                meta_pattern_list.insert(pat_id, (best_piece.2, 0, Some(low_order_id)));
                 //                                                ^^^ This has to be replaced out of this function
 
                 // Insert piece intro metapattern piece list
-                MetaPatternPieceList.insert((best_piece.0, best_piece.1), pat_id);
+                meta_pattern_piece_list.insert((best_piece.0, best_piece.1), pat_id);
 
                 println!("  -> Found piece! {:?}", best_piece);
                 // Set flag for reordering occurrence list
@@ -319,8 +310,8 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
     // println!("{}: MetaPatternList = {:?}", "[DEBUG]".cyan().bold(), MetaPatternList);
     // println!("{}: MetaPatternPieceList = {:?}", "[DEBUG]".cyan().bold(), MetaPatternPieceList);
 
-    if MetaPatternList.len() > 0 {
-        return Some((MetaPatternList, MetaPatternPieceList));
+    if meta_pattern_list.len() > 0 {
+        return Some((meta_pattern_list, meta_pattern_piece_list));
     } else {
         return None;
     }
