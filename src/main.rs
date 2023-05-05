@@ -85,7 +85,7 @@ fn main() {
     /* -------- PARSE -------- */
     eprintln!("{} Opening matrixmarket file: {}", "[INFO]".cyan().bold(), matrixmarket_file_path);
     let mut base_matrix: SpSearchMatrix = SpSearchMatrix::from_file(matrixmarket_file_path);
-    
+
     eprintln!("{} Opening patterns file: {}", "[INFO]".cyan().bold(), patterns_file_path);
     base_matrix.load_patterns(patterns_file_path);
 

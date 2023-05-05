@@ -32,7 +32,7 @@ impl SpSearchMatrix {
         //     println!("{}: [{},{}]", val, row, col);
         // });
 
-        let mut value_matrix = CsMat::empty(f64_value_matrix.storage(), f64_value_matrix.inner_dims());
+        let mut value_matrix = CsMat::zero((f64_value_matrix.rows(), f64_value_matrix.cols()));
 
         f64_value_matrix.iter().for_each(|(_, (row, col))| {
             value_matrix.insert(row, col, false);
