@@ -16,6 +16,9 @@ mod spfgen;
 #[allow(unused_imports)]
 use crate::spfgen::SPFGen;
 
+#[macro_use(c)]
+extern crate cute;
+
 mod utils;
 
 fn main() {
@@ -82,7 +85,7 @@ fn main() {
     /* -------- PARSE -------- */
     eprintln!("{} Opening matrixmarket file: {}", "[INFO]".cyan().bold(), matrixmarket_file_path);
     let mut base_matrix: SpSearchMatrix = SpSearchMatrix::from_file(matrixmarket_file_path);
-    
+
     eprintln!("{} Opening patterns file: {}", "[INFO]".cyan().bold(), patterns_file_path);
     base_matrix.load_patterns(patterns_file_path);
 
@@ -125,7 +128,7 @@ fn main() {
         let mut spaugment;
         if augment_dimensionality > 1 {
             // Augment dimensionality
-            spaugment = SpAugment::from_1d_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
+            spaugment = SpAugment::from_1d_origin_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
             spaugment.augment_dimensionality(augment_dimensionality, augment_dimensionality_piece_cutoff);
         }
 
