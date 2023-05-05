@@ -5,8 +5,7 @@ use linked_hash_map::LinkedHashMap;
 use linked_hash_set::LinkedHashSet;
 use sprs::{CsMat, TriMat};
 
-use crate::utils::{Pattern,Piece,Uwc,OriginUwc, MetaPattern, MetaPatternPiece, convex_hull_rectangle_nd};
-use crate::utils::{pattern_to_uwc,convex_hull_1d};
+use crate::utils::{Pattern,Piece,Uwc,OriginUwc, MetaPattern, MetaPatternPiece, convex_hull_rectangle_nd, pattern_to_uwc};
 
 pub struct SPFGen {
     pub nrows: usize,
@@ -203,9 +202,7 @@ impl SPFGen {
             // println!("    - Dimension of i_p = {}", u[0].len());
             
             // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
-            let ch: Vec<Vec<i32>> = convex_hull_1d(&u, &w, false);
-            // FIXME
-            let _ = convex_hull_rectangle_nd(&u, &w, false);
+            let ch: Vec<Vec<i32>> = convex_hull_rectangle_nd(&u, &w, false);
             
             // Write minimal point
             // FIXME for higher dimensionality
@@ -252,9 +249,7 @@ impl SPFGen {
             file.write_i16::<LittleEndian>(*id as i16).unwrap();
 
             // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
-            let ch: Vec<Vec<i32>> = convex_hull_1d(&u, &w, true);
-            // FIXME
-            let _ = convex_hull_rectangle_nd(&u, &w, true);
+            let ch: Vec<Vec<i32>> = convex_hull_rectangle_nd(&u, &w, true);
 
             // Write coordinates of AST's starting point
             file.write_i32::<LittleEndian>(*row as i32).unwrap(); // row
