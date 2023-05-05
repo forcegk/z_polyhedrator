@@ -122,16 +122,16 @@ pub fn convex_hull_rectangle_nd(u: &Vec<Vec<i32>>, w: &Vec<i32>, dense: bool) ->
     // let w = vec![3,7,2,0,0,0];
 
     // let (u_up, u_low) = u.split_at(u.len()/2);
-    let (w_up, w_low) = w.split_at(w.len()/2);
+    let (w_high, w_low) = w.split_at(w.len()/2);
 
     let mut ch : Vec<Vec<i32>> = vec![vec![]];
 
     for idx in 0..dims-{if dense {0} else {1}}{
-        ch = c![ {let mut v = cur.clone(); v.push(i); v}, for i in -w_low[idx]..=w_up[idx], for cur in &ch ];
+        ch = c![ {let mut v = cur.clone(); v.push(i); v}, for i in -w_low[idx]..=w_high[idx], for cur in &ch ];
     }
 
     if !dense {
-        ch = c![ {let mut v = cur.clone(); v.push(i); v}, for i in vec![-w_low[dims-1],w_up[dims-1]], for cur in &ch ];
+        ch = c![ {let mut v = cur.clone(); v.push(i); v}, for i in vec![-w_low[dims-1],w_high[dims-1]], for cur in &ch ];
     }
 
     return ch;
