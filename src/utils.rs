@@ -99,7 +99,60 @@ pub fn orig_uwc_to_piece_1d(uwc: &OriginUwc) -> Piece {
 
 #[inline(always)]
 #[allow(dead_code)]
-pub fn convex_hull_1d(_u: &Vec<Vec<i32>>, w: &Vec<i32>, _dense: bool) -> Vec<i32>{
+pub fn convex_hull_1d(_u: &Vec<Vec<i32>>, w: &Vec<i32>, _dense: bool) -> Vec<Vec<i32>>{
     // FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore :)
-    (w[1]..=w[0]).collect::<Vec<i32>>()
+    (w[1]..=w[0]).map(|w| vec![w]).collect::<Vec<Vec<i32>>>()
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub fn convex_hull_rectangle_nd(u: &Vec<Vec<i32>>, w: &Vec<i32>, dense: bool) -> Vec<Vec<i32>> {
+    // This code only works for u values like [[-1,0],[0,-1],[1,0],[0,1]]. No values other than 1, 0 or -1 are accepted to this point
+
+    let dims = u[0].len();
+    if dims < 2 {
+        return convex_hull_1d(u, w, dense);
+    }
+
+    // FIXME DEBUG
+    let dims = 3;
+    // let u = vec![vec![-1,0], vec![0,-1], vec![1,0], vec![0,1]];
+    let u = vec![vec![-1,0,0],vec![0,-1,0],vec![0,0,-1],vec![1,0,0],vec![0,1,0],vec![0,0,1]];
+    // let w = vec![3,7,0,0];
+    let w = vec![3,7,2,0,0,0];
+
+    // let (u_up, u_low) = u.split_at(u.len()/2);
+    let (w_up, w_low) = w.split_at(w.len()/2);
+
+    // eprintln!("[ch] u_up = {:?}, u_low = {:?}", u_up, u_low);
+    // eprintln!("[ch] w_up = {:?}, w_low = {:?}", w_up, w_low);
+
+    // let ranges: Vec<i32> = w_up.iter().zip(w_low.iter()).map(|(u,l)| *u + *l + 1).collect();
+
+    // eprintln!("[ch] Ranges = {:?}", ranges);
+
+    // let length = {
+    //     if dense {
+    //         ranges.iter().fold(1usize, |len,val| len as usize * (*val as usize))
+    //     } else {
+    //         // Initial an final values for last dimension are always two
+    //         2usize * ranges.split_last().unwrap().1.iter().fold(1usize, |len,val| len as usize * (*val as usize))
+    //     }
+    // };
+
+    // eprintln!("[ch] Length = {:?} for dense = {:?}", length, dense);
+
+    let mut ch : Vec<Vec<i32>> = vec![vec![]];
+
+    for idx in 0..dims-{if dense {0} else {1}}{
+        ch = c![ {let mut v = cur.clone(); v.push(i); v}, for i in -w_low[idx]..=w_up[idx], for cur in &ch ];
+    }
+
+    if !dense {
+        ch = c![ {let mut v = cur.clone(); v.push(i); v}, for i in vec![-w_low[dims-1],w_up[dims-1]], for cur in &ch ];
+    }
+
+    // eprintln!("[CH] {:?}. Lenght = {:?}", ch, ch.len());
+
+    return ch;
 }

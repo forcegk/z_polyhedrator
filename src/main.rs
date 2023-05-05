@@ -16,6 +16,9 @@ mod spfgen;
 #[allow(unused_imports)]
 use crate::spfgen::SPFGen;
 
+#[macro_use(c)]
+extern crate cute;
+
 mod utils;
 
 fn main() {
