@@ -24,7 +24,7 @@ pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str, transpose_input:
         match sprs::io::read_matrix_market(path) {
             Ok(mat) => {
                 if transpose_input {
-                    mat.transpose_view().to_csc()
+                    mat.transpose_view().to_csr()
                 } else {
                     mat.to_csr()
                 }
