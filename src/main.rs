@@ -32,17 +32,23 @@ fn main() {
         /// Print patterns parsed from pattern list
         optional --print-pattern-list
 
-        /// [2D SEARCH] Search Flags. Valid options: {[PatternFirst], CellFirst} where [] = default.
-        optional --search-flags search_flags: String
-
-        /// Write to custom SPF file. By default writes to matrix_market_file.mtx.spf
-        optional -w,--write-spf output_spf_file_path: PathBuf
-
         /// Print piece list (AST list)
         optional --print-ast-list
 
         /// Print uwc lists
         optional --print-uwc-list
+
+        /// Transpose matrix at input
+        optional -ti, --transpose-input
+
+        /// Transpose matrix at output
+        optional -to, --transpose-output
+
+        /// [2D SEARCH] Search Flags. Valid options: {[PatternFirst], CellFirst} where [] = default.
+        optional --search-flags search_flags: String
+
+        /// Write to custom SPF file. By default writes to matrix_market_file.mtx.spf
+        optional -w,--write-spf output_spf_file_path: PathBuf
 
         /// Augment dimensionality
         optional -a, --augment-dimensionality augment_dimensionality: usize
@@ -84,7 +90,7 @@ fn main() {
 
     /* -------- PARSE -------- */
     eprintln!("{} Opening matrixmarket file: {}", "[INFO]".cyan().bold(), matrixmarket_file_path);
-    let mut base_matrix: SpSearchMatrix = SpSearchMatrix::from_file(matrixmarket_file_path);
+    let mut base_matrix: SpSearchMatrix = SpSearchMatrix::from_file(matrixmarket_file_path, flags.transpose_input);
 
     eprintln!("{} Opening patterns file: {}", "[INFO]".cyan().bold(), patterns_file_path);
     base_matrix.load_patterns(patterns_file_path);
@@ -135,7 +141,7 @@ fn main() {
         // TODO send back augmentated model to spfgen. Implement new dump logic.
 
         if output_spf_file_path.0 {
-            spfgen.write_spf(matrixmarket_file_path, output_spf_file_path.1.as_str());
+            spfgen.write_spf(matrixmarket_file_path, output_spf_file_path.1.as_str(), flags.transpose_input, flags.transpose_output);
         }
 
     }

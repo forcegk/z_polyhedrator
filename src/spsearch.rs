@@ -24,8 +24,8 @@ bitflags! {
 }
 
 impl SpSearchMatrix {
-    pub fn from_file(path: &str) -> SpSearchMatrix {
-        let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(path);
+    pub fn from_file(path: &str, transpose_input: bool) -> SpSearchMatrix {
+        let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(path, transpose_input);
 
         // println!("{:?}", (f64_value_matrix.rows(), f64_value_matrix.cols(), f64_value_matrix.nnz()));
         // f64_value_matrix.iter().for_each(|(&val, (row, col))| {

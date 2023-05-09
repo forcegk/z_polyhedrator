@@ -19,10 +19,16 @@ pub type MetaPattern = ( (i32, i32, i32),  i32,  Option<i32> );
 //                             X     Y
 pub type MetaPatternPiece = (usize,usize);
 
-pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str) -> CsMat<T> {
+pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str, transpose_input: bool) -> CsMat<T> {
     let value_matrix: CsMat<T> = {
         match sprs::io::read_matrix_market(path) {
-            Ok(mat) => {mat.to_csr()},
+            Ok(mat) => {
+                if transpose_input {
+                    mat.transpose_view().to_csc()
+                } else {
+                    mat.to_csr()
+                }
+            },
             Err(_) => {
                 eprintln!(
                     "\n{} MatrixMarket file was incompatible with {} crate. Trying to convert it on the fly...",
@@ -47,7 +53,12 @@ pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str) -> CsMat<T> {
                     "./utils/transcode_mm.py".bright_blue()
                 );
 
-                sprs::io::read_matrix_market_from_bufread(&mut bufreader).unwrap().to_csr()
+                let mat = sprs::io::read_matrix_market_from_bufread(&mut bufreader).unwrap();
+                if transpose_input {
+                    mat.transpose_view().to_csr()
+                } else {
+                    mat.to_csr()
+                }
             },
         }
     };

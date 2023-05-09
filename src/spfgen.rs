@@ -134,9 +134,9 @@ impl SPFGen {
             .collect::<Vec<(OriginUwc, i32)>>()
     }
 
-    pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str) {
+    pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str, transpose_input: bool, _transpose_output: bool) {
         // Read matrixmarket f64 value matrix
-        let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(input_value_matrix);
+        let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(input_value_matrix, transpose_input);
 
         // Quick sanity check
         if f64_value_matrix.nnz() != self.nnz {
