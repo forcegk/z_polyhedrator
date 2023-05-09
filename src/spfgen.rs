@@ -48,7 +48,7 @@ impl SPFGen {
         { // scoped to keep aux_meta_patterns in memory the least time possible
             let aux_meta_patterns: HashMap<Pattern, i32> = meta_patterns
                 .iter()
-                .map(|(key, MP)| (MP.0, *key))
+                .map(|(key, mp)| (mp.0, *key))
                 .collect();
 
             meta_pattern_pieces = ast_list
@@ -238,8 +238,7 @@ impl SPFGen {
 
         let mut data_offset: i32 = 0;
         let mut mpp_iter = self.meta_pattern_pieces.iter();
-        for idx in 0..piece_cutoff {
-
+        for _ in 0..piece_cutoff {
             let ((row,col),id) = mpp_iter.next().unwrap();
             let (pattern, order, subpattern) = self.meta_patterns.get(id).unwrap();
 
