@@ -141,7 +141,11 @@ fn main() {
         // TODO send back augmentated model to spfgen. Implement new dump logic.
 
         if output_spf_file_path.0 {
-            spfgen.write_spf(matrixmarket_file_path, output_spf_file_path.1.as_str(), flags.transpose_input, flags.transpose_output);
+            spfgen.write_spf(&matrixmarket_file_path, &output_spf_file_path.1, flags.transpose_input, flags.transpose_output);
+        }
+
+        if output_spf_file_path.0 {
+            spfgen.write_spf_nd(&matrixmarket_file_path, &format!("{}{}", &output_spf_file_path.1, ".new.spf"), flags.transpose_input, flags.transpose_output);
         }
 
     }

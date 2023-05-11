@@ -1,7 +1,8 @@
+use linked_hash_map::LinkedHashMap;
 use num_traits::{Num, NumCast};
 use sprs::{CsMat};
 use stringreader::StringReader;
-use std::{io::BufReader, process::{Command, Stdio}};
+use std::{io::BufReader, process::{Command, Stdio}, collections::VecDeque, time::Instant};
 use colored::Colorize;
 
 use std::io::prelude::*;
@@ -97,6 +98,53 @@ pub fn pattern_to_uwc(pattern: &Pattern) -> Uwc {
     let u = vec![ vec![-1], vec![1] ];
     let w = vec![ it_range, 0 ];
     let c = vec![ *i, *j ];
+
+    return (u, w, c);
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub fn metapattern_to_uwc(metapattern_id: i32, meta_patterns: &LinkedHashMap<i32, MetaPattern>) -> Uwc {
+    let ((n, i, j), order, subpattern) = meta_patterns.get(&metapattern_id).unwrap();
+
+    // DEBUG VALUES
+    let order: i32 = 4;
+    let order = &order;
+
+    // Create U values
+    let mut u: Vec<Vec<i32>> = vec![vec![0;*order as usize];*order as usize * 2];
+    let (u_top, u_bottom) = u.split_at_mut(*order as usize);
+
+    for idx in 0..*order {
+        *(*u_top.get_mut(idx as usize).unwrap()).get_mut((idx) as usize).unwrap() = -1;
+        *(*u_bottom.get_mut(idx as usize).unwrap()).get_mut((idx) as usize).unwrap() = 1;
+    }
+
+    println!("[DEBUG] u = {:?}", u);
+
+    let it_range = n-1;
+
+    let mut w: Vec<i32> = vec![0;*order as usize * 2];
+    let mut c: Vec<i32> = vec![0;*order as usize * 2];
+
+    let (c_top, c_bottom) = c.split_at_mut(*order as usize);
+
+    let mut curr_id = metapattern_id;
+    for idx in 0..*order {
+        let ((n,i,j),_, subpat) = meta_patterns.get(&curr_id).unwrap();
+        *w.get_mut(idx as usize).unwrap() = *n-1;
+
+        *c_top.get_mut(idx as usize).unwrap() = *i;
+        *c_bottom.get_mut(idx as usize).unwrap() = *j;
+
+        curr_id = subpat.unwrap_or_default(); // The last one will never be accessed
+
+        // DEBUG
+        // curr_id = curr_id+1;
+    }
+
+    println!("[DEBUG] w = {:?}", w);
+    println!("[DEBUG] c = {:?}", c);
 
     return (u, w, c);
 }
