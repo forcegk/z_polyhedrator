@@ -169,6 +169,14 @@ impl SpAugment {
             // println!("MP_Dict:\n{:?}\nLen: {}", self.meta_patterns, self.meta_patterns.len());
         } // for dims
     }
+
+    pub fn get_metapatterns(&self) -> LinkedHashMap<i32, MetaPattern> {
+        return self.meta_patterns.clone();
+    }
+
+    pub fn get_metapattern_pieces(&self) -> LinkedHashMap<MetaPatternPiece, i32> {
+        return self.meta_pattern_pieces.clone();
+    }
 }
 
 #[inline(always)]

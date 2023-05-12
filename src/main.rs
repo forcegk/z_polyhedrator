@@ -119,26 +119,22 @@ fn main() {
 
 
     if flags.print_uwc_list || output_spf_file_path.0 || augment_dimensionality > 1 {
-        let spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list(), base_matrix.numrows, base_matrix.numcols, base_matrix.nonzeros);
-
-        // Already done before
-        // if flags.print_ast_list {
-        //     spfgen.print_ast_list();
-        // }
-
-        if flags.print_uwc_list {
-            spfgen.print_uwc_list(true);
-            spfgen.print_distinct_uwc_list(true);
-        }
+        let mut spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list(), base_matrix.numrows, base_matrix.numcols, base_matrix.nonzeros);
 
         let mut spaugment;
         if augment_dimensionality > 1 {
             // Augment dimensionality
             spaugment = SpAugment::from_1d_origin_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
             spaugment.augment_dimensionality(augment_dimensionality, augment_dimensionality_piece_cutoff);
+
+            // And update spfgen accordingly
+            spfgen = SPFGen::from_metapatterns_list(spaugment.get_metapatterns(), spaugment.get_metapattern_pieces(), spfgen.nrows, spfgen.ncols, spfgen.nnz, spfgen.inc_nnz);
         }
 
-        // TODO send back augmentated model to spfgen. Implement new dump logic.
+        if flags.print_uwc_list {
+            spfgen.print_uwc_list(true);
+            spfgen.print_distinct_uwc_list(true);
+        }
 
         if output_spf_file_path.0 {
             spfgen.write_spf(&matrixmarket_file_path, &output_spf_file_path.1, flags.transpose_input, flags.transpose_output);

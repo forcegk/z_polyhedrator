@@ -1,11 +1,12 @@
 use std::{fs::{File, self}, path::PathBuf, io::{SeekFrom, Seek}, collections::HashMap};
 
 use byteorder::{WriteBytesExt, LittleEndian};
+use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use linked_hash_set::LinkedHashSet;
 use sprs::{CsMat, TriMat};
 
-use crate::utils::{Pattern,Piece,Uwc,OriginUwc, MetaPattern, MetaPatternPiece, convex_hull_rectangle_nd, pattern_to_uwc, metapattern_to_uwc};
+use crate::utils::{Pattern,Piece,Uwc,OriginUwc, MetaPattern, MetaPatternPiece, convex_hull_hyperrectangle_nd, metapattern_to_hyperrectangle_uwc, pattern_to_uwc};
 
 pub struct SPFGen {
     pub nrows: usize,
@@ -57,20 +58,6 @@ impl SPFGen {
                 .collect();
         }
 
-        // let uwc_list: Vec<(Uwc, i32)> = ast_list
-        //     .iter()
-        //     .map(|(_,_,pattern)| (pattern_to_uwc(pattern), *distinct_patterns.get(pattern).unwrap()))
-        //     .collect();
-
-        // let distinct_uwc: LinkedHashMap<Uwc, i32> = distinct_patterns
-        //     .iter()
-        //     .map(|(pattern, id)| (pattern_to_uwc(pattern), *id))
-        //     .collect();
-
-        // println!("nrows = {}, ncols = {}, nnz = {}, inc_nnz = {}", nrows, ncols, nnz, inc_nnz);
-        // println!("\nLen={}. {:?}\n", distinct_patterns.len(), distinct_patterns);
-        // println!("\nLen={}. {:?}\n", distinct_uwc.len(), distinct_uwc);
-
         return SPFGen {
             nrows,
             ncols,
@@ -81,11 +68,26 @@ impl SPFGen {
         };
     }
 
-    // pub fn from_metapatterns_list(meta_patterns: LinkedHashMap<i32, MetaPattern>, meta_pattern_pieces: LinkedHashMap<MetaPatternPiece, i32>, nrows: usize, ncols: usize, nnz: usize) -> Self {
-    //     // TODO id reordering
+    pub fn from_metapatterns_list(meta_patterns: LinkedHashMap<i32, MetaPattern>, meta_pattern_pieces: LinkedHashMap<MetaPatternPiece, i32>, nrows: usize, ncols: usize, nnz: usize, inc_nnz: usize) -> Self {
+        // Reorder id = -1
+        let ninc_nnz_lhm: LinkedHashMap<MetaPatternPiece, i32> = meta_pattern_pieces.iter().filter(|(_,id)| **id == -1).map(|(rowcol, id)| (*rowcol, *id)).collect();
 
-    //     return SPFGen { ast_list: (), uwc_list: (), nrows: (), ncols: (), nnz: (), inc_nnz: (), distinct_patterns: (), distinct_uwc: () }
-    // }
+        let mut meta_pattern_pieces: LinkedHashMap<MetaPatternPiece, i32> = meta_pattern_pieces.into_iter().filter(|(_,id)| *id != -1).collect();
+        meta_pattern_pieces.extend(ninc_nnz_lhm);
+
+        // Not necessary
+        // let mut mp = meta_patterns;
+        // mp.get_refresh(&-1);
+
+        return SPFGen {
+            nrows,
+            ncols,
+            nnz,
+            inc_nnz,
+            meta_patterns,
+            meta_pattern_pieces
+        }
+    }
 
     #[allow(dead_code)]
     pub fn print_ast_list(&self) {
@@ -98,29 +100,25 @@ impl SPFGen {
     pub fn print_uwc_list(&self, show_eqs: bool) {
         println!("Uwc List:\nid\tU\t\tw\tc");
         self.meta_pattern_pieces.iter().for_each(|(_, id)| {
-            let (u,w,c) = pattern_to_uwc(&self.meta_patterns.get(id).unwrap().0);
+            let (u,w,c) = metapattern_to_hyperrectangle_uwc(*id, &self.meta_patterns);
             print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(&u, &w) } else { "\n".to_string() } });
         });
     }
 
     pub fn print_distinct_uwc_list(&self, show_eqs: bool) {
         println!("Distinct Uwc List:\nid\tU\t\tw\tc");
-        self.meta_patterns.iter().for_each(|(id, (pattern,_,_))| {
-            let (u,w,c) = pattern_to_uwc(pattern);
+        self.meta_patterns.iter().for_each(|(id, _)| {
+            let (u,w,c) = metapattern_to_hyperrectangle_uwc(*id, &self.meta_patterns);
             print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(&u, &w) } else { "\n".to_string() } });
         });
-
-        metapattern_to_uwc(0, &self.meta_patterns);
     }
 
     #[allow(dead_code)]
     pub fn get_uwc_list(&self) -> Vec<(Uwc, i32)> {
-        //self.uwc_list.clone()
-        // FIXME
         self.meta_pattern_pieces
             .iter()
             .map(|(_, id)| {
-                let uwc = pattern_to_uwc(&self.meta_patterns.get(id).unwrap().0);
+                let uwc = metapattern_to_hyperrectangle_uwc(*id, &self.meta_patterns);
                 (uwc, *id)
             })
             .collect::<Vec<(Uwc, i32)>>()
@@ -130,7 +128,7 @@ impl SPFGen {
         self.meta_pattern_pieces
             .iter()
             .map(|((row,col), id)| {
-                let uwc = pattern_to_uwc(&self.meta_patterns.get(id).unwrap().0);
+                let uwc = metapattern_to_hyperrectangle_uwc(*id, &self.meta_patterns);
                 ((*row,*col,uwc), *id)
             })
             .collect::<Vec<(OriginUwc, i32)>>()
@@ -204,7 +202,7 @@ impl SPFGen {
             // println!("    - Dimension of i_p = {}", u[0].len());
 
             // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
-            let ch: Vec<Vec<i32>> = convex_hull_rectangle_nd(&u, &w, false);
+            let ch: Vec<Vec<i32>> = convex_hull_hyperrectangle_nd(&u, &w, false);
 
             // Write minimal point
             // FIXME for higher dimensionality
@@ -250,7 +248,7 @@ impl SPFGen {
             file.write_i16::<LittleEndian>(*id as i16).unwrap();
 
             // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
-            let ch: Vec<Vec<i32>> = convex_hull_rectangle_nd(&u, &w, true);
+            let ch: Vec<Vec<i32>> = convex_hull_hyperrectangle_nd(&u, &w, true);
 
             // Write coordinates of AST's starting point
             file.write_i32::<LittleEndian>(*row as i32).unwrap(); // row
@@ -369,8 +367,8 @@ impl SPFGen {
 
         // Write dimensions
         file.write_i16::<LittleEndian>(2i16).unwrap();
-        // number of base shapes is actual found shapes, not unfound ones. Also we have to take into account removing the single nonzeros
-        file.write_i32::<LittleEndian>((self.meta_patterns.len()-1) as i32).unwrap();
+        // number of base shapes is actual found shapes, not unfound ones. Also we have to take into account removing the single nonzeros\
+        file.write_i32::<LittleEndian>((self.meta_pattern_pieces.iter().filter(|(_, id)| **id != -1).unique_by(|(_, id)| **id).count()) as i32).unwrap();
         // write zero hierarchical shapes
         file.write_i32::<LittleEndian>(0i32).unwrap();
         // write TEMPORARY ZERO as pointer to start of data. Will need to fseek to position 26 later
@@ -387,51 +385,61 @@ impl SPFGen {
 
         let shape_dims_max: i16 = {
             if piece_cutoff == 0 { 0i16 }
-            else { 1i16 }
+            else {
+                let (_, (_, max_order, _)) = self.meta_patterns.iter().max_by_key(|(_,(_,order,_))| *order).unwrap();
+                *max_order as i16
+            }
         };
 
         // Write maximum dimensionality of iP for vertex_rec (FIXME this currently only supports 1d)
         file.write_i16::<LittleEndian>(shape_dims_max).unwrap();
 
-        // FIXME Get shape_dims_max from previous it
         for _ in 0..shape_dims_max {
             file.write_i32::<LittleEndian>(0i32).unwrap();
         }
 
         // println!("Writing u={:?}, w={:?}, c={:?} with id={:?}", u, w, c, id);
-        self.meta_patterns
+        // Create REORDER dictionary
+        let reorder: LinkedHashMap<i32, usize> = self.meta_pattern_pieces
             .iter()
-            .filter(|(id,_)| **id != ninc_nonzero_pattern_id)
-            .for_each(|(id, (pattern, order, subpattern))| {
+            .filter(|(_, id)| **id != -1)
+            .unique_by(|(_, id)| **id)
+            .enumerate()
+            .map(|(idx, (_, id))| (*id, idx))
+            .collect();
 
-            let (u,w,c) = pattern_to_uwc(pattern);
+        eprintln!("REORDER: {:?}", reorder);
+
+        self.meta_pattern_pieces
+            .iter()
+            .filter(|(_, id)| **id != -1)
+            .for_each(|((row,col), id)| {
+
+            let (u,w,c) = metapattern_to_hyperrectangle_uwc(*id, &self.meta_patterns);
 
             // Write shape id
-            file.write_i16::<LittleEndian>(*id as i16).unwrap();
+            file.write_i16::<LittleEndian>( *reorder.get(id).unwrap() as i16 ).unwrap();
             // Write type of encoding. 0 = vertex_rec, 1 = vertex_gen, 2 = ineqs . FIXME only writes vertex_rec
             file.write_i16::<LittleEndian>(0i16).unwrap();
             // Write dimension of i_p. Hardcodec for vertex_rec
+            // INFO This can also be done by accessing self.metapatterns and checking ORDER field
             file.write_i16::<LittleEndian>(u[0].len() as i16).unwrap();
             // println!("    - Dimension of i_p = {}", u[0].len());
 
             // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
-            let ch: Vec<Vec<i32>> = convex_hull_rectangle_nd(&u, &w, false);
+            let ch: Vec<Vec<i32>> = convex_hull_hyperrectangle_nd(&u, &w, false);
 
             // Write minimal point
-            // FIXME for higher dimensionality
-            for i in 0..1 {
+            for i in 0..ch[0].len() {
                 file.write_i32::<LittleEndian>(ch[0][i]).unwrap();
-                // println!("    - Minimal point from ch[0] = {}", ch[0]);
+                // println!("    - Minimal point from ch[0] = {}", ch[0][i]);
             }
 
             // Write lenghts along axis
-            // FIXME for higher dimensionality
-            for _ in 0..1 {
-                // taking shortcut as all input are 1-d
-
-                // FIXME higher dimensionality
-                file.write_i32::<LittleEndian>(w[0]-w[1]).unwrap();
-                // println!("    - Lenghts along axes from from w[0]-[w1] = {}  ==  {} = ch[-1]-ch[0]", w[0]-w[1], ch[ch.len()-1]-ch[0]);
+            for i in 0..ch[0].len() {
+                // taking shortcut as minimal points are always [0,0,...,0] (N times)
+                file.write_i32::<LittleEndian>(ch[ch.len()-1][i]).unwrap();
+                // println!("    - Lenghts along axes from ch[ch.len()-1][i] {:?}", ch[ch.len()-1][i]);
             }
 
             // "Hardcoded stride at this time"
@@ -445,6 +453,8 @@ impl SPFGen {
             }
             // println!("c = {:?}", c);
         });
+
+        ////////////////////////////////////////////////// TO THIS POINT
 
         // Write total number of origins
         file.write_i32::<LittleEndian>(piece_cutoff as i32).unwrap();
@@ -461,7 +471,7 @@ impl SPFGen {
             file.write_i16::<LittleEndian>(*id as i16).unwrap();
 
             // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
-            let ch: Vec<Vec<i32>> = convex_hull_rectangle_nd(&u, &w, true);
+            let ch: Vec<Vec<i32>> = convex_hull_hyperrectangle_nd(&u, &w, true);
 
             // Write coordinates of AST's starting point
             file.write_i32::<LittleEndian>(*row as i32).unwrap(); // row

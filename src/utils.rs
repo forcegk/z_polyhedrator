@@ -89,6 +89,7 @@ pub fn flatten<T>(nested: Vec<Vec<T>>) -> Vec<T> {
 // TODO fix this for n-dimensional (currently 1D only)
 #[inline(always)]
 #[allow(dead_code)]
+#[deprecated(note="please use metapattern_to_hyperrectangle_uwc")]
 pub fn pattern_to_uwc(pattern: &Pattern) -> Uwc {
     let (n, i, j) = pattern;
 
@@ -104,12 +105,12 @@ pub fn pattern_to_uwc(pattern: &Pattern) -> Uwc {
 
 #[inline(always)]
 #[allow(dead_code)]
-pub fn metapattern_to_uwc(metapattern_id: i32, meta_patterns: &LinkedHashMap<i32, MetaPattern>) -> Uwc {
+pub fn metapattern_to_hyperrectangle_uwc(metapattern_id: i32, meta_patterns: &LinkedHashMap<i32, MetaPattern>) -> Uwc {
     let ((n, i, j), order, subpattern) = meta_patterns.get(&metapattern_id).unwrap();
 
     // DEBUG VALUES
-    let order: i32 = 4;
-    let order = &order;
+    // let order: i32 = 4;
+    // let order = &order;
 
     // Create U values
     let mut u: Vec<Vec<i32>> = vec![vec![0;*order as usize];*order as usize * 2];
@@ -120,9 +121,7 @@ pub fn metapattern_to_uwc(metapattern_id: i32, meta_patterns: &LinkedHashMap<i32
         *(*u_bottom.get_mut(idx as usize).unwrap()).get_mut((idx) as usize).unwrap() = 1;
     }
 
-    println!("[DEBUG] u = {:?}", u);
-
-    let it_range = n-1;
+    // println!("[DEBUG] u = {:?}", u);
 
     let mut w: Vec<i32> = vec![0;*order as usize * 2];
     let mut c: Vec<i32> = vec![0;*order as usize * 2];
@@ -143,8 +142,8 @@ pub fn metapattern_to_uwc(metapattern_id: i32, meta_patterns: &LinkedHashMap<i32
         // curr_id = curr_id+1;
     }
 
-    println!("[DEBUG] w = {:?}", w);
-    println!("[DEBUG] c = {:?}", c);
+    // println!("[DEBUG] w = {:?}", w);
+    // println!("[DEBUG] c = {:?}", c);
 
     return (u, w, c);
 }
@@ -165,7 +164,7 @@ fn convex_hull_1d(_u: &Vec<Vec<i32>>, w: &Vec<i32>, _dense: bool) -> Vec<Vec<i32
 
 #[inline(always)]
 #[allow(dead_code)]
-pub fn convex_hull_rectangle_nd(u: &Vec<Vec<i32>>, w: &Vec<i32>, dense: bool) -> Vec<Vec<i32>> {
+pub fn convex_hull_hyperrectangle_nd(u: &Vec<Vec<i32>>, w: &Vec<i32>, dense: bool) -> Vec<Vec<i32>> {
     // This code only works for u values like [[-1,0],[0,-1],[1,0],[0,1]]. No values other than 1, 0 or -1 are accepted to this point
 
     let dims = u[0].len();
