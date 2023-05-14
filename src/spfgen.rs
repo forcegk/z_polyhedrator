@@ -333,13 +333,17 @@ impl SPFGen {
         file.write_i32::<LittleEndian>(curr_pos as i32).unwrap();
         file.seek(SeekFrom::Start(curr_pos)).unwrap();
 
+        println!("DUMPING PIECES! ================ ");
         // f.write( struct.pack( len(self.mask)*"d", *mat.data[self.reorder] ) )
         self.meta_pattern_pieces.iter().for_each(|((row,col),id)| {
-            let ((n,i,j),order,subpattern) = self.meta_patterns.get(id).unwrap();
+            print!("Traversing {:?} with id {:?} == ", (*row,*col), *id);
+            let ((n,i,j),_,_) = self.meta_patterns.get(id).unwrap();
             for ii in 0..*n {
                 let position = f64_value_matrix.get((*row as i64 + (*i as i64 * ii as i64)) as usize, (*col as i64 + (*j as i64 * ii as i64)) as usize).unwrap();
+                print!("{:?}, ", *position);
                 file.write_f64::<LittleEndian>(*position).unwrap();
             }
+            println!("");
         });
 
         // ES VERDAD QUE NO HAY QUE HACER FILE CLOSE :)
@@ -367,7 +371,7 @@ impl SPFGen {
 
         // Write dimensions
         file.write_i16::<LittleEndian>(2i16).unwrap();
-        // number of base shapes is actual found shapes, not unfound ones. Also we have to take into account removing the single nonzeros\
+        // number of base shapes is actual found shapes, not unfound ones. Also we have to take into account removing the single nonzeros
         file.write_i32::<LittleEndian>((self.meta_pattern_pieces.iter().filter(|(_, id)| **id != -1).unique_by(|(_, id)| **id).count()) as i32).unwrap();
         // write zero hierarchical shapes
         file.write_i32::<LittleEndian>(0i32).unwrap();
@@ -413,7 +417,7 @@ impl SPFGen {
         self.meta_pattern_pieces
             .iter()
             .filter(|(_, id)| **id != -1)
-            .for_each(|((row,col), id)| {
+            .for_each(|(_, id)| {
 
             let (u,w,c) = metapattern_to_hyperrectangle_uwc(*id, &self.meta_patterns);
 
@@ -463,14 +467,13 @@ impl SPFGen {
         let mut mpp_iter = self.meta_pattern_pieces.iter();
         for _ in 0..piece_cutoff {
             let ((row,col),id) = mpp_iter.next().unwrap();
-            let (pattern, order, subpattern) = self.meta_patterns.get(id).unwrap();
 
-            let (u,w,_) = pattern_to_uwc(pattern);
+            let (u,w,_) = metapattern_to_hyperrectangle_uwc(*id, &self.meta_patterns);
 
             // Write shape id
-            file.write_i16::<LittleEndian>(*id as i16).unwrap();
+            file.write_i16::<LittleEndian>( *reorder.get(id).unwrap() as i16 ).unwrap();
 
-            // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
+            // Get convex_hull
             let ch: Vec<Vec<i32>> = convex_hull_hyperrectangle_nd(&u, &w, true);
 
             // Write coordinates of AST's starting point
@@ -493,7 +496,6 @@ impl SPFGen {
         eprint!("Writing uninc_format = {} to offset 0x{:X}... ", uninc_format, file.seek(SeekFrom::Current(0)).unwrap());
         file.write_u8(uninc_format).unwrap();
 
-        // TODO write CSR // COO dump codes
         // Set iterator
         let mut mpp_iter = self.meta_pattern_pieces.iter().skip(piece_cutoff);
 
@@ -556,17 +558,50 @@ impl SPFGen {
         file.write_i32::<LittleEndian>(curr_pos as i32).unwrap();
         file.seek(SeekFrom::Start(curr_pos)).unwrap();
 
+
+        println!("DUMPING PIECES! ================ ");
         // f.write( struct.pack( len(self.mask)*"d", *mat.data[self.reorder] ) )
         self.meta_pattern_pieces.iter().for_each(|((row,col),id)| {
-            let ((n,i,j),order,subpattern) = self.meta_patterns.get(id).unwrap();
-            for ii in 0..*n {
-                let position = f64_value_matrix.get((*row as i64 + (*i as i64 * ii as i64)) as usize, (*col as i64 + (*j as i64 * ii as i64)) as usize).unwrap();
-                file.write_f64::<LittleEndian>(*position).unwrap();
+            print!("Traversing {:?} with id {:?} == ", (*row,*col), *id);
+            println!("{:?} || ", recursive_traverse(&(*row,*col), *id, &self.meta_patterns, &f64_value_matrix));
+
+            for val in recursive_traverse(&(*row,*col), *id, &self.meta_patterns, &f64_value_matrix){
+                file.write_f64::<LittleEndian>(val).unwrap();
             }
         });
 
         // ES VERDAD QUE NO HAY QUE HACER FILE CLOSE :)
     }
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+fn recursive_traverse(metapattern_piece: &MetaPatternPiece, metapattern_id: i32, meta_patterns: &LinkedHashMap<i32, MetaPattern>, f64_value_matrix: &CsMat<f64>) -> Vec<f64> {
+    let (row,col) = metapattern_piece;
+    let ((n,i,j), order, subpat) = meta_patterns.get(&metapattern_id).unwrap();
+    let mut v = vec![];
+    if *order < 2 {
+        for ii in 0..*n {
+            let value = f64_value_matrix.get((*row as i64 + (*i as i64 * ii as i64)) as usize, (*col as i64 + (*j as i64 * ii as i64)) as usize).unwrap();
+            v.push(*value);
+        }
+    } else {
+        for ii in 0..*n {
+            v.append(
+                &mut recursive_traverse(
+                    &(
+                        (*row as i64 + (*i as i64 * ii as i64)) as usize,
+                        (*col as i64 + (*j as i64 * ii as i64)) as usize
+                    ),
+                    subpat.unwrap(),
+                    meta_patterns,
+                    f64_value_matrix
+                )
+            )
+        }
+    }
+
+    return v;
 }
 
 #[inline(always)]
