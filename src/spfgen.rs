@@ -134,6 +134,7 @@ impl SPFGen {
             .collect::<Vec<(OriginUwc, i32)>>()
     }
 
+    #[deprecated(note="please use write_spf_nd")]
     pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str, transpose_input: bool, _transpose_output: bool) {
         // Read matrixmarket f64 value matrix
         let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(input_value_matrix, transpose_input);
@@ -189,7 +190,7 @@ impl SPFGen {
         self.meta_patterns
             .iter()
             .filter(|(id,_)| **id != ninc_nonzero_pattern_id)
-            .for_each(|(id, (pattern, order, subpattern))| {
+            .for_each(|(id, (pattern, _, _))| {
 
             let (u,w,c) = pattern_to_uwc(pattern);
 
@@ -240,7 +241,7 @@ impl SPFGen {
         let mut mpp_iter = self.meta_pattern_pieces.iter();
         for _ in 0..piece_cutoff {
             let ((row,col),id) = mpp_iter.next().unwrap();
-            let (pattern, order, subpattern) = self.meta_patterns.get(id).unwrap();
+            let (pattern, _, _) = self.meta_patterns.get(id).unwrap();
 
             let (u,w,_) = pattern_to_uwc(pattern);
 
@@ -333,20 +334,14 @@ impl SPFGen {
         file.write_i32::<LittleEndian>(curr_pos as i32).unwrap();
         file.seek(SeekFrom::Start(curr_pos)).unwrap();
 
-        println!("DUMPING PIECES! ================ ");
         // f.write( struct.pack( len(self.mask)*"d", *mat.data[self.reorder] ) )
         self.meta_pattern_pieces.iter().for_each(|((row,col),id)| {
-            print!("Traversing {:?} with id {:?} == ", (*row,*col), *id);
             let ((n,i,j),_,_) = self.meta_patterns.get(id).unwrap();
             for ii in 0..*n {
                 let position = f64_value_matrix.get((*row as i64 + (*i as i64 * ii as i64)) as usize, (*col as i64 + (*j as i64 * ii as i64)) as usize).unwrap();
-                print!("{:?}, ", *position);
                 file.write_f64::<LittleEndian>(*position).unwrap();
             }
-            println!("");
         });
-
-        // ES VERDAD QUE NO HAY QUE HACER FILE CLOSE :)
     }
 
     pub fn write_spf_nd(&self, input_value_matrix: &str, output_file_path: &str, transpose_input: bool, _transpose_output: bool) {
@@ -402,7 +397,6 @@ impl SPFGen {
             file.write_i32::<LittleEndian>(0i32).unwrap();
         }
 
-        // println!("Writing u={:?}, w={:?}, c={:?} with id={:?}", u, w, c, id);
         // Create REORDER dictionary
         let reorder: LinkedHashMap<i32, usize> = self.meta_pattern_pieces
             .iter()
@@ -417,6 +411,7 @@ impl SPFGen {
         self.meta_pattern_pieces
             .iter()
             .filter(|(_, id)| **id != -1)
+            .unique_by(|(_, id)| **id)
             .for_each(|(_, id)| {
 
             let (u,w,c) = metapattern_to_hyperrectangle_uwc(*id, &self.meta_patterns);
@@ -457,8 +452,6 @@ impl SPFGen {
             }
             // println!("c = {:?}", c);
         });
-
-        ////////////////////////////////////////////////// TO THIS POINT
 
         // Write total number of origins
         file.write_i32::<LittleEndian>(piece_cutoff as i32).unwrap();
@@ -559,18 +552,12 @@ impl SPFGen {
         file.seek(SeekFrom::Start(curr_pos)).unwrap();
 
 
-        println!("DUMPING PIECES! ================ ");
         // f.write( struct.pack( len(self.mask)*"d", *mat.data[self.reorder] ) )
         self.meta_pattern_pieces.iter().for_each(|((row,col),id)| {
-            print!("Traversing {:?} with id {:?} == ", (*row,*col), *id);
-            println!("{:?} || ", recursive_traverse(&(*row,*col), *id, &self.meta_patterns, &f64_value_matrix));
-
             for val in recursive_traverse(&(*row,*col), *id, &self.meta_patterns, &f64_value_matrix){
                 file.write_f64::<LittleEndian>(val).unwrap();
             }
         });
-
-        // ES VERDAD QUE NO HAY QUE HACER FILE CLOSE :)
     }
 }
 

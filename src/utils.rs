@@ -2,7 +2,7 @@ use linked_hash_map::LinkedHashMap;
 use num_traits::{Num, NumCast};
 use sprs::{CsMat};
 use stringreader::StringReader;
-use std::{io::BufReader, process::{Command, Stdio}, collections::VecDeque, time::Instant};
+use std::{io::BufReader, process::{Command, Stdio}};
 use colored::Colorize;
 
 use std::io::prelude::*;
@@ -106,7 +106,7 @@ pub fn pattern_to_uwc(pattern: &Pattern) -> Uwc {
 #[inline(always)]
 #[allow(dead_code)]
 pub fn metapattern_to_hyperrectangle_uwc(metapattern_id: i32, meta_patterns: &LinkedHashMap<i32, MetaPattern>) -> Uwc {
-    let ((n, i, j), order, subpattern) = meta_patterns.get(&metapattern_id).unwrap();
+    let (_, order, _) = meta_patterns.get(&metapattern_id).unwrap();
 
     // DEBUG VALUES
     // let order: i32 = 4;
