@@ -301,7 +301,6 @@ impl SPFGen {
                     });
                  },
             2 => {  eprintln!("Writing COO");
-                    eprint!("Writing Rowptr: ");
 
                     let mut rowvec: Vec<i32> = vec![];
                     let mut colvec: Vec<i32> = vec![];
@@ -312,8 +311,9 @@ impl SPFGen {
                         colvec.push(*col as i32);
                     }
 
+                    eprint!("Writing Rowptr: ");
                     for row in rowvec {
-                        print!("{} ", row);
+                        eprint!("{} ", row);
                         file.write_i32::<LittleEndian>(row).unwrap(); // Write rowptr
                     }
                     eprint!("\nWriting Colptr: ");
@@ -344,7 +344,7 @@ impl SPFGen {
         });
     }
 
-    pub fn write_spf_nd(&self, input_value_matrix: &str, output_file_path: &str, transpose_input: bool, _transpose_output: bool) {
+    pub fn write_spf_nd(&self, input_value_matrix: &str, output_file_path: &str, transpose_input: bool, transpose_output: bool) {
         // Read matrixmarket f64 value matrix
         let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(input_value_matrix, transpose_input);
 
@@ -361,8 +361,15 @@ impl SPFGen {
         // Write header
         file.write_i32::<LittleEndian>(self.nnz as i32).unwrap();
         file.write_i32::<LittleEndian>(self.inc_nnz as i32).unwrap();
-        file.write_i32::<LittleEndian>(self.nrows as i32).unwrap();
-        file.write_i32::<LittleEndian>(self.ncols as i32).unwrap();
+        if !transpose_output {
+            // Write matrix in a normal way
+            file.write_i32::<LittleEndian>(self.nrows as i32).unwrap();
+            file.write_i32::<LittleEndian>(self.ncols as i32).unwrap();
+        } else {
+            // Write it transposed
+            file.write_i32::<LittleEndian>(self.ncols as i32).unwrap();
+            file.write_i32::<LittleEndian>(self.nrows as i32).unwrap();
+        }
 
         // Write dimensions
         file.write_i16::<LittleEndian>(2i16).unwrap();
@@ -390,7 +397,7 @@ impl SPFGen {
             }
         };
 
-        // Write maximum dimensionality of iP for vertex_rec (FIXME this currently only supports 1d)
+        // Write maximum dimensionality of iP for vertex_rec
         file.write_i16::<LittleEndian>(shape_dims_max).unwrap();
 
         for _ in 0..shape_dims_max {
@@ -447,10 +454,18 @@ impl SPFGen {
             }
 
             // Write lattice
-            for cc in c {
-                file.write_i32::<LittleEndian>(cc).unwrap();
+            if !transpose_output {
+                // println!("c = {:?}", c);
+                for cc in c {
+                    file.write_i32::<LittleEndian>(cc).unwrap();
+                }
+            } else {
+                let (c_high, c_low) = c.split_at(c.len()/2);
+
+                for cc in c_low.into_iter().chain(c_high.into_iter()) {
+                    file.write_i32::<LittleEndian>(*cc).unwrap();
+                }
             }
-            // println!("c = {:?}", c);
         });
 
         // Write total number of origins
@@ -470,8 +485,13 @@ impl SPFGen {
             let ch: Vec<Vec<i32>> = convex_hull_hyperrectangle_nd(&u, &w, true);
 
             // Write coordinates of AST's starting point
-            file.write_i32::<LittleEndian>(*row as i32).unwrap(); // row
-            file.write_i32::<LittleEndian>(*col as i32).unwrap(); // col
+            if !transpose_output {
+                file.write_i32::<LittleEndian>(*row as i32).unwrap(); // row
+                file.write_i32::<LittleEndian>(*col as i32).unwrap(); // col
+            } else {
+                file.write_i32::<LittleEndian>(*col as i32).unwrap(); // col
+                file.write_i32::<LittleEndian>(*row as i32).unwrap(); // row
+            }
             file.write_i32::<LittleEndian>(data_offset).unwrap();                 // data offset
             data_offset += ch.len() as i32;   // Offset in elements. no judgment about data type
         }
@@ -494,16 +514,21 @@ impl SPFGen {
 
         match uninc_format {
             0 => {  eprintln!("Writing CSR");
-                    // panic!("Not implemented!")
-                    let mut local_csr_mat: TriMat<u8> = TriMat::new((self.nrows, self.ncols));
+                    let mut local_coo_mat: TriMat<u8> = TriMat::new((self.nrows, self.ncols));
                     eprint!("Writing points: [");
 
                     for _ in piece_cutoff..self.meta_pattern_pieces.len() {
                         let (row, col) = mpp_iter.next().unwrap().0;
                         print!("({},{}) ", *row, *col);
-                        local_csr_mat.add_triplet(*row, *col, 1u8);
+                        local_coo_mat.add_triplet(*row, *col, 1u8);
                     }
-                    let local_csr_mat: CsMat<u8> = local_csr_mat.to_csr();
+
+                    let local_csr_mat: CsMat<u8>;
+                    if !transpose_output {
+                        local_csr_mat = local_coo_mat.to_csr();
+                    } else {
+                        local_csr_mat = local_coo_mat.transpose_view().to_csr();
+                    }
 
                     eprintln!("\x08] with:\nind_ptr: {:?}", local_csr_mat.proper_indptr());
                     eprintln!("indices: {:?}", local_csr_mat.indices());
@@ -518,7 +543,6 @@ impl SPFGen {
                     });
                  },
             2 => {  eprintln!("Writing COO");
-                    eprint!("Writing Rowptr: ");
 
                     let mut rowvec: Vec<i32> = vec![];
                     let mut colvec: Vec<i32> = vec![];
@@ -529,8 +553,13 @@ impl SPFGen {
                         colvec.push(*col as i32);
                     }
 
+                    if transpose_output {
+                        std::mem::swap(&mut rowvec, &mut colvec);
+                    }
+
+                    eprint!("Writing Rowptr: ");
                     for row in rowvec {
-                        print!("{} ", row);
+                        eprint!("{} ", row);
                         file.write_i32::<LittleEndian>(row).unwrap(); // Write rowptr
                     }
                     eprint!("\nWriting Colptr: ");
