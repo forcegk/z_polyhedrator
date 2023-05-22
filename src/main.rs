@@ -125,7 +125,7 @@ fn main() {
         if augment_dimensionality > 1 {
             // Augment dimensionality
             spaugment = SpAugment::from_1d_origin_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
-            spaugment.augment_dimensionality(augment_dimensionality, augment_dimensionality_piece_cutoff);
+            spaugment.augment_dimensionality(augment_dimensionality, augment_dimensionality_piece_cutoff, 600);
 
             // And update spfgen accordingly
             spfgen = SPFGen::from_metapatterns_list(spaugment.get_metapatterns(), spaugment.get_metapattern_pieces(), spfgen.nrows, spfgen.ncols, spfgen.nnz, spfgen.inc_nnz);

@@ -53,7 +53,7 @@ impl SpAugment {
         }
     }
 
-    pub fn augment_dimensionality(&mut self, target_dim: usize, piece_cutoff: usize) {
+    pub fn augment_dimensionality(&mut self, target_dim: usize, piece_cutoff: usize, max_stride: usize) {
 
         if piece_cutoff < 2 {
             panic!("\n{} How are you supposed to make length={} pieces?", "[spaugment]".red().bold(), piece_cutoff);
@@ -99,7 +99,7 @@ impl SpAugment {
                     println!("\n------- compute_metapatterns for id = {} -------", curr_id);
 
                     // Compute metapatterns FIXME parametrize max and min strides
-                    match compute_metapatterns(&mut origins_list, piece_cutoff, start_id, curr_id) {
+                    match compute_metapatterns(&mut origins_list, piece_cutoff, start_id, curr_id, max_stride) {
                         Some((l_new_metapats, l_new_metapat_pieces)) => {
                             start_id += l_new_metapats.len() as i32;
 
@@ -181,14 +181,15 @@ impl SpAugment {
 
 #[inline(always)]
 #[allow(dead_code)]
-fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize, start_id: i32, low_order_id: i32) -> Option<(LinkedHashMap<i32, MetaPattern>, LinkedHashMap<MetaPatternPiece, i32>)> {
+fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize, start_id: i32, low_order_id: i32, max_stride: usize) -> Option<(LinkedHashMap<i32, MetaPattern>, LinkedHashMap<MetaPatternPiece, i32>)> {
     // DEBUG UNCOMMENT
     // println!("Metapatterns: {:?}", origins_list);
 
     let origin_list_len = origins_list.len();
 
     // No feasible higher order metapatterns
-    if origin_list_len <= 1 {
+    if origin_list_len < piece_cutoff {
+        println!("  -> Skip for pieces from id={} as len = {} < {} = piece cutoff", low_order_id, origin_list_len, piece_cutoff);
         return None;
     }
 
@@ -208,6 +209,7 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
         .iter()
         .tuple_combinations()
         .map(|(a,b)| fn_tuple_sub (*b, *a))
+        .filter(|(sx,sy)| (i32::abs(*sx) as usize <= max_stride || i32::abs(*sy) as usize <= max_stride) )
         .collect::<Vec<(i32,i32)>>();
 
     // DEBUG UNCOMMENT
@@ -236,7 +238,6 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
 
     let mut best_piece: Piece = (0,0,((piece_cutoff-1) as i32,0,0));
     let mut found_piece: bool = false;
-    // let origin_list_len (from previously)
 
     'L1: loop {
         if found_piece {
