@@ -86,23 +86,6 @@ pub fn flatten<T>(nested: Vec<Vec<T>>) -> Vec<T> {
     nested.into_iter().flatten().collect()
 }
 
-// TODO fix this for n-dimensional (currently 1D only)
-#[inline(always)]
-#[allow(dead_code)]
-#[deprecated(note="please use metapattern_to_hyperrectangle_uwc")]
-pub fn pattern_to_uwc(pattern: &Pattern) -> Uwc {
-    let (n, i, j) = pattern;
-
-    let it_range = n-1;
-
-    // TODO fix here for n-dimensional (currently 1D only)
-    let u = vec![ vec![-1], vec![1] ];
-    let w = vec![ it_range, 0 ];
-    let c = vec![ *i, *j ];
-
-    return (u, w, c);
-}
-
 #[inline(always)]
 #[allow(dead_code)]
 pub fn metapattern_to_hyperrectangle_uwc(metapattern_id: i32, meta_patterns: &LinkedHashMap<i32, MetaPattern>) -> Uwc {

@@ -145,11 +145,7 @@ fn main() {
         }
 
         if output_spf_file_path.0 {
-            spfgen.write_spf(&matrixmarket_file_path, &format!("{}.legacy.spf", &output_spf_file_path.1), flags.transpose_input, flags.transpose_output);
-        }
-
-        if output_spf_file_path.0 {
-            spfgen.write_spf_nd(&matrixmarket_file_path, &format!("{}.{}d.spf", &output_spf_file_path.1, augment_dimensionality), flags.transpose_input, flags.transpose_output);
+            spfgen.write_spf(&matrixmarket_file_path, &format!("{}.{}d.spf", &output_spf_file_path.1, augment_dimensionality), flags.transpose_input, flags.transpose_output);
         }
 
     }
