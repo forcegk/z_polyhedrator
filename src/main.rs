@@ -32,10 +32,10 @@ fn main() {
         /// Print patterns parsed from pattern list
         optional --print-pattern-list
 
-        /// Print piece list (AST list)
+        /// Print 1D piece list (AST list) before any dimensionality augmentation
         optional --print-ast-list
 
-        /// Print uwc lists
+        /// Print uwc and distinct uwc lists after dimensionality augmentation
         optional --print-uwc-list
 
         /// Transpose matrix at input
