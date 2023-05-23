@@ -209,7 +209,7 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
         .iter()
         .tuple_combinations()
         .map(|(a,b)| fn_tuple_sub (*b, *a))
-        .filter(|(sx,sy)| (i32::abs(*sx) as usize <= max_stride || i32::abs(*sy) as usize <= max_stride) )
+        .filter(|(sx,sy)| (i32::abs(*sx) as usize <= max_stride && i32::abs(*sy) as usize <= max_stride) )
         .collect::<Vec<(i32,i32)>>();
 
     // DEBUG UNCOMMENT
@@ -223,6 +223,8 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
         //                                                                                       solve tie on equal reps by prioritizing closer pieces. i64 to avoid OF
         .sorted_by_key(|((stride_x, stride_y),reps)| std::cmp::Reverse((*reps , ( -((*stride_x) as i64 * (*stride_x) as i64) ) as i64 - ((*stride_y) as i64 *(*stride_y) as i64) as i64 )))
         .collect::<LinkedHashMap<(i32,i32),u32>>();
+
+    // println!("Strides = {:?}\nOccurrences = {:?}", strides, occurrences);
 
     // DEBUG UNCOMMENT
     // println!("OCCURRENCES: {:?}", occurrences);

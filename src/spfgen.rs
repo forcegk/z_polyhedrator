@@ -283,7 +283,7 @@ impl SPFGen {
 
                     for _ in piece_cutoff..self.meta_pattern_pieces.len() {
                         let (row, col) = mpp_iter.next().unwrap().0;
-                        print!("({},{}) ", *row, *col);
+                        eprint!("({},{}) ", *row, *col);
                         local_csr_mat.add_triplet(*row, *col, 1u8);
                     }
                     let local_csr_mat: CsMat<u8> = local_csr_mat.to_csr();
@@ -519,7 +519,7 @@ impl SPFGen {
 
                     for _ in piece_cutoff..self.meta_pattern_pieces.len() {
                         let (row, col) = mpp_iter.next().unwrap().0;
-                        print!("({},{}) ", *row, *col);
+                        eprint!("({},{}) ", *row, *col);
                         local_coo_mat.add_triplet(*row, *col, 1u8);
                     }
 
