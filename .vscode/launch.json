@@ -19,7 +19,7 @@
                     "kind": "bin"
                 }
             },
-            "args": [".\\data\\patterns_2.txt", ".\\data\\sparse\\impcol_b\\impcol_b.mtx", "-a", "3", "-pl", "4"],
+            "args": [".\\data\\patterns_2.txt", ".\\data\\sparse\\1138_bus\\1138_bus.mtx", "-a", "2", "-psmin", "0", "-psmax", "10", "-pl", "4"],
             "cwd": "${workspaceFolder}"
         }
     ]

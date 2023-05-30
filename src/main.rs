@@ -56,8 +56,11 @@ fn main() {
         /// Minimum piece length for dimensionality augmentation
         optional -pl, --augment-dimensionality-piece-cutoff augment_dimensionality_piece_cutoff: usize
 
-        /// Max stride for augment dimensionality search
-        optional -ps, --augment-dimensionality-piece-stride augment_dimensionality_piece_stride: usize
+       /// Min stride for augment dimensionality search
+       optional -psmin, --augment-dimensionality-piece-stride-min augment_dimensionality_piece_stride_min: usize
+
+       /// Max stride for augment dimensionality search
+       optional -psmax, --augment-dimensionality-piece-stride-max augment_dimensionality_piece_stride_max: usize
     };
 
     let patterns_file_path = flags.patterns_file_path.to_str().unwrap();
@@ -120,9 +123,14 @@ fn main() {
         None => 2usize,
     };
 
-    let augment_dimensionality_piece_stride: usize = match flags.augment_dimensionality_piece_stride {
+    let augment_dimensionality_piece_stride_max: usize = match flags.augment_dimensionality_piece_stride_max {
         Some(x) => x,
         None => std::usize::MAX,
+    };
+
+    let augment_dimensionality_piece_stride_min: usize = match flags.augment_dimensionality_piece_stride_min {
+        Some(x) => x,
+        None => 0usize,
     };
 
 
@@ -133,7 +141,7 @@ fn main() {
         if augment_dimensionality > 1 {
             // Augment dimensionality
             spaugment = SpAugment::from_1d_origin_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
-            spaugment.augment_dimensionality(augment_dimensionality, augment_dimensionality_piece_cutoff, augment_dimensionality_piece_stride);
+            spaugment.augment_dimensionality(augment_dimensionality, augment_dimensionality_piece_cutoff, augment_dimensionality_piece_stride_min, augment_dimensionality_piece_stride_max);
 
             // And update spfgen accordingly
             spfgen = SPFGen::from_metapatterns_list(spaugment.get_metapatterns(), spaugment.get_metapattern_pieces(), spfgen.nrows, spfgen.ncols, spfgen.nnz, spfgen.inc_nnz);
