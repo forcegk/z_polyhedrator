@@ -222,8 +222,9 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
         .iter()
         .into_group_map_by(|x| **x)
         .into_iter()
-        .map(|(k,v)| (k, v.len() as u32))
-        //                                                                                       solve tie on equal reps by prioritizing closer pieces. i64 to avoid OF
+        // Very important to add one to the length of the strides. Each time that a piece is found, one has to be added too.
+        .map(|(k,v)| (k, v.len() as u32 + 1u32))
+        // solve tie on equal reps by prioritizing closer pieces. i64 to avoid OF
         .sorted_by_key(|((stride_x, stride_y),reps)| std::cmp::Reverse((*reps , ( -((*stride_x) as i64 * (*stride_x) as i64) ) as i64 - ((*stride_y) as i64 *(*stride_y) as i64) as i64 )))
         .collect::<LinkedHashMap<(i32,i32),u32>>();
 
@@ -251,7 +252,8 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
             let remainder;
             {// scoped so it does not interfere
                 let p = occurrences.get_mut(&(i,j)).unwrap();
-                remainder = *p - (n as u32 -1);
+                // add one to account for the creation of an aditional vertex
+                remainder = *p - (n as u32) + 1u32;
                 *p = remainder;
             }
 
