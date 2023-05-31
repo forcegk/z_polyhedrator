@@ -1,6 +1,6 @@
 use linked_hash_map::LinkedHashMap;
 use num_traits::{Num, NumCast};
-use sprs::{CsMat};
+use sprs::CsMat;
 use stringreader::StringReader;
 use std::{io::BufReader, process::{Command, Stdio}};
 use colored::Colorize;
@@ -20,7 +20,15 @@ pub type MetaPattern = ( (i32, i32, i32),  i32,  Option<i32> );
 //                             X     Y
 pub type MetaPatternPiece = (usize,usize);
 
-pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str, transpose_input: bool) -> CsMat<T> {
+pub fn read_matrix_market_csr<
+    T: Num +
+       NumCast +
+       std::clone::Clone +
+       sprs::num_kinds::PrimitiveKind +
+       sprs::num_matrixmarket::MatrixMarketRead +
+       sprs::num_matrixmarket::MatrixMarketConjugate +
+       std::ops::Neg<Output = T>
+    > (path: &str, transpose_input: bool) -> CsMat<T> {
     let value_matrix: CsMat<T> = {
         match sprs::io::read_matrix_market(path) {
             Ok(mat) => {
