@@ -107,17 +107,15 @@ pub fn metapattern_to_hyperrectangle_uwc(metapattern_id: i32, meta_patterns: &Li
     // println!("[DEBUG] u = {:?}", u);
 
     let mut w: Vec<i32> = vec![0;*order as usize * 2];
-    let mut c: Vec<i32> = vec![0;*order as usize * 2];
-
-    let (c_top, c_bottom) = c.split_at_mut(*order as usize);
+    let mut c: Vec<i32> = Vec::with_capacity(*order as usize * 2);
 
     let mut curr_id = metapattern_id;
     for idx in 0..*order {
         let ((n,i,j),_, subpat) = meta_patterns.get(&curr_id).unwrap();
         *w.get_mut(idx as usize).unwrap() = *n-1;
 
-        *c_top.get_mut(idx as usize).unwrap() = *i;
-        *c_bottom.get_mut(idx as usize).unwrap() = *j;
+        c.push(*i);
+        c.push(*j);
 
         curr_id = subpat.unwrap_or_default(); // The last one will never be accessed
 
