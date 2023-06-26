@@ -32,23 +32,35 @@ fn main() {
         /// Print patterns parsed from pattern list
         optional --print-pattern-list
 
+        /// Print 1D piece list (AST list) before any dimensionality augmentation
+        optional --print-ast-list
+
+        /// Print uwc and distinct uwc lists after dimensionality augmentation
+        optional --print-uwc-list
+
+        /// Transpose matrix at input
+        optional -ti, --transpose-input
+
+        /// Transpose matrix at output
+        optional -to, --transpose-output
+
         /// [2D SEARCH] Search Flags. Valid options: {[PatternFirst], CellFirst} where [] = default.
         optional --search-flags search_flags: String
 
         /// Write to custom SPF file. By default writes to matrix_market_file.mtx.spf
         optional -w,--write-spf output_spf_file_path: PathBuf
 
-        /// Print piece list (AST list)
-        optional --print-ast-list
-
-        /// Print uwc lists
-        optional --print-uwc-list
-
         /// Augment dimensionality
         optional -a, --augment-dimensionality augment_dimensionality: usize
 
         /// Minimum piece length for dimensionality augmentation
-        optional -pl, --augmen-dimensionality-piece-cutoff augment_dimensionality_piece_cutoff: usize
+        optional -pl, --augment-dimensionality-piece-cutoff augment_dimensionality_piece_cutoff: usize
+
+       /// Min stride for augment dimensionality search
+       optional -psmin, --augment-dimensionality-piece-stride-min augment_dimensionality_piece_stride_min: usize
+
+       /// Max stride for augment dimensionality search
+       optional -psmax, --augment-dimensionality-piece-stride-max augment_dimensionality_piece_stride_max: usize
     };
 
     let patterns_file_path = flags.patterns_file_path.to_str().unwrap();
@@ -84,7 +96,7 @@ fn main() {
 
     /* -------- PARSE -------- */
     eprintln!("{} Opening matrixmarket file: {}", "[INFO]".cyan().bold(), matrixmarket_file_path);
-    let mut base_matrix: SpSearchMatrix = SpSearchMatrix::from_file(matrixmarket_file_path);
+    let mut base_matrix: SpSearchMatrix = SpSearchMatrix::from_file(matrixmarket_file_path, flags.transpose_input);
 
     eprintln!("{} Opening patterns file: {}", "[INFO]".cyan().bold(), patterns_file_path);
     base_matrix.load_patterns(patterns_file_path);
@@ -106,36 +118,42 @@ fn main() {
         None => 1usize,
     };
 
-    let augment_dimensionality_piece_cutoff: usize = match flags.augmen_dimensionality_piece_cutoff {
+    let augment_dimensionality_piece_cutoff: usize = match flags.augment_dimensionality_piece_cutoff {
         Some(x) => x,
         None => 2usize,
     };
 
+    let augment_dimensionality_piece_stride_max: usize = match flags.augment_dimensionality_piece_stride_max {
+        Some(x) => x,
+        None => std::usize::MAX,
+    };
+
+    let augment_dimensionality_piece_stride_min: usize = match flags.augment_dimensionality_piece_stride_min {
+        Some(x) => x,
+        None => 0usize,
+    };
+
 
     if flags.print_uwc_list || output_spf_file_path.0 || augment_dimensionality > 1 {
-        let spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list(), base_matrix.numrows, base_matrix.numcols, base_matrix.nonzeros);
+        let mut spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list(), base_matrix.numrows, base_matrix.numcols, base_matrix.nonzeros);
 
-        // Already done before
-        // if flags.print_ast_list {
-        //     spfgen.print_ast_list();
-        // }
+        let mut spaugment;
+        if augment_dimensionality > 1 {
+            // Augment dimensionality
+            spaugment = SpAugment::from_1d_origin_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
+            spaugment.augment_dimensionality(augment_dimensionality, augment_dimensionality_piece_cutoff, augment_dimensionality_piece_stride_min, augment_dimensionality_piece_stride_max);
+
+            // And update spfgen accordingly
+            spfgen = SPFGen::from_metapatterns_list(spaugment.get_metapatterns(), spaugment.get_metapattern_pieces(), spfgen.nrows, spfgen.ncols, spfgen.nnz, spfgen.inc_nnz);
+        }
 
         if flags.print_uwc_list {
             spfgen.print_uwc_list(true);
             spfgen.print_distinct_uwc_list(true);
         }
 
-        let mut spaugment;
-        if augment_dimensionality > 1 {
-            // Augment dimensionality
-            spaugment = SpAugment::from_1d_origin_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
-            spaugment.augment_dimensionality(augment_dimensionality, augment_dimensionality_piece_cutoff);
-        }
-
-        // TODO send back augmentated model to spfgen. Implement new dump logic.
-
         if output_spf_file_path.0 {
-            spfgen.write_spf(matrixmarket_file_path, output_spf_file_path.1.as_str());
+            spfgen.write_spf(&matrixmarket_file_path, &format!("{}.{}d.spf", &output_spf_file_path.1, augment_dimensionality), flags.transpose_input, flags.transpose_output);
         }
 
     }

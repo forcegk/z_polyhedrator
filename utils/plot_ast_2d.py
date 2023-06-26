@@ -144,7 +144,7 @@ class AST:
             )
 
 class ASTReader:
-    AST_MAGIC_HEADER = 'Row\tCol\tN\tI\tJ'
+    AST_MAGIC_HEADER = 'RowColNIJ'
 
     def __init__(self, ast_file):
         self._ast_file = ast_file
@@ -160,7 +160,7 @@ class ASTReader:
         if len(raw_asts) == 0:
             raise ValueError(f'AST file {self._ast_file} is empty')
 
-        if raw_asts[0] != ASTReader.AST_MAGIC_HEADER:
+        if ''.join(raw_asts[0].split()) != ASTReader.AST_MAGIC_HEADER:
             raise ValueError(
                 f'AST file {self._ast_file} does not have a valid header'
             )
@@ -168,7 +168,7 @@ class ASTReader:
 
         asts = []
         for raw_ast in raw_asts:
-            tmp_raw_ast = raw_ast.split('\t')
+            tmp_raw_ast = raw_ast.split()
 
             if len(tmp_raw_ast) != 5:
                 raise ValueError(f'`{raw_ast}` is not a valid AST')

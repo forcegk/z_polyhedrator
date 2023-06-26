@@ -53,7 +53,7 @@ impl SpAugment {
         }
     }
 
-    pub fn augment_dimensionality(&mut self, target_dim: usize, piece_cutoff: usize) {
+    pub fn augment_dimensionality(&mut self, target_dim: usize, piece_cutoff: usize, min_stride: usize, max_stride: usize) {
 
         if piece_cutoff < 2 {
             panic!("\n{} How are you supposed to make length={} pieces?", "[spaugment]".red().bold(), piece_cutoff);
@@ -99,7 +99,7 @@ impl SpAugment {
                     println!("\n------- compute_metapatterns for id = {} -------", curr_id);
 
                     // Compute metapatterns FIXME parametrize max and min strides
-                    match compute_metapatterns(&mut origins_list, piece_cutoff, start_id, curr_id) {
+                    match compute_metapatterns(&mut origins_list, piece_cutoff, start_id, curr_id, min_stride, max_stride) {
                         Some((l_new_metapats, l_new_metapat_pieces)) => {
                             start_id += l_new_metapats.len() as i32;
 
@@ -169,18 +169,27 @@ impl SpAugment {
             // println!("MP_Dict:\n{:?}\nLen: {}", self.meta_patterns, self.meta_patterns.len());
         } // for dims
     }
+
+    pub fn get_metapatterns(&self) -> LinkedHashMap<i32, MetaPattern> {
+        return self.meta_patterns.clone();
+    }
+
+    pub fn get_metapattern_pieces(&self) -> LinkedHashMap<MetaPatternPiece, i32> {
+        return self.meta_pattern_pieces.clone();
+    }
 }
 
 #[inline(always)]
 #[allow(dead_code)]
-fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize, start_id: i32, low_order_id: i32) -> Option<(LinkedHashMap<i32, MetaPattern>, LinkedHashMap<MetaPatternPiece, i32>)> {
+fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize, start_id: i32, low_order_id: i32, min_stride: usize, max_stride: usize) -> Option<(LinkedHashMap<i32, MetaPattern>, LinkedHashMap<MetaPatternPiece, i32>)> {
     // DEBUG UNCOMMENT
     // println!("Metapatterns: {:?}", origins_list);
 
     let origin_list_len = origins_list.len();
 
     // No feasible higher order metapatterns
-    if origin_list_len <= 1 {
+    if origin_list_len < piece_cutoff {
+        println!("  -> Skip for pieces from id={} as len = {} < {} = piece cutoff", low_order_id, origin_list_len, piece_cutoff);
         return None;
     }
 
@@ -200,6 +209,10 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
         .iter()
         .tuple_combinations()
         .map(|(a,b)| fn_tuple_sub (*b, *a))
+        .filter(|(sx,sy)| {
+            let (absx, absy) = (i32::abs(*sx) as usize, i32::abs(*sy) as usize);
+            absx <= max_stride && absy <= max_stride && absx >= min_stride && absy >= min_stride
+        })
         .collect::<Vec<(i32,i32)>>();
 
     // DEBUG UNCOMMENT
@@ -209,10 +222,13 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
         .iter()
         .into_group_map_by(|x| **x)
         .into_iter()
-        .map(|(k,v)| (k, v.len() as u32))
-        //                                                                                       solve tie on equal reps by prioritizing closer pieces. i64 to avoid OF
+        // Very important to add one to the length of the strides. Each time that a piece is found, one has to be added too.
+        .map(|(k,v)| (k, v.len() as u32 + 1u32))
+        // solve tie on equal reps by prioritizing closer pieces. i64 to avoid OF
         .sorted_by_key(|((stride_x, stride_y),reps)| std::cmp::Reverse((*reps , ( -((*stride_x) as i64 * (*stride_x) as i64) ) as i64 - ((*stride_y) as i64 *(*stride_y) as i64) as i64 )))
         .collect::<LinkedHashMap<(i32,i32),u32>>();
+
+    // println!("Strides = {:?}\nOccurrences = {:?}", strides, occurrences);
 
     // DEBUG UNCOMMENT
     // println!("OCCURRENCES: {:?}", occurrences);
@@ -228,7 +244,6 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
 
     let mut best_piece: Piece = (0,0,((piece_cutoff-1) as i32,0,0));
     let mut found_piece: bool = false;
-    // let origin_list_len (from previously)
 
     'L1: loop {
         if found_piece {
@@ -237,7 +252,8 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
             let remainder;
             {// scoped so it does not interfere
                 let p = occurrences.get_mut(&(i,j)).unwrap();
-                remainder = *p - (n as u32 -1);
+                // add one to account for the creation of an aditional vertex
+                remainder = *p - (n as u32) + 1u32;
                 *p = remainder;
             }
 

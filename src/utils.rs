@@ -1,5 +1,6 @@
+use linked_hash_map::LinkedHashMap;
 use num_traits::{Num, NumCast};
-use sprs::{CsMat};
+use sprs::CsMat;
 use stringreader::StringReader;
 use std::{io::BufReader, process::{Command, Stdio}};
 use colored::Colorize;
@@ -19,10 +20,24 @@ pub type MetaPattern = ( (i32, i32, i32),  i32,  Option<i32> );
 //                             X     Y
 pub type MetaPatternPiece = (usize,usize);
 
-pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str) -> CsMat<T> {
+pub fn read_matrix_market_csr<
+    T: Num +
+       NumCast +
+       std::clone::Clone +
+       sprs::num_kinds::PrimitiveKind +
+       sprs::num_matrixmarket::MatrixMarketRead +
+       sprs::num_matrixmarket::MatrixMarketConjugate +
+       std::ops::Neg<Output = T>
+    > (path: &str, transpose_input: bool) -> CsMat<T> {
     let value_matrix: CsMat<T> = {
         match sprs::io::read_matrix_market(path) {
-            Ok(mat) => {mat.to_csr()},
+            Ok(mat) => {
+                if transpose_input {
+                    mat.transpose_view().to_csr()
+                } else {
+                    mat.to_csr()
+                }
+            },
             Err(_) => {
                 eprintln!(
                     "\n{} MatrixMarket file was incompatible with {} crate. Trying to convert it on the fly...",
@@ -47,7 +62,12 @@ pub fn read_matrix_market_csr<T: Num+NumCast+Clone>(path: &str) -> CsMat<T> {
                     "./utils/transcode_mm.py".bright_blue()
                 );
 
-                sprs::io::read_matrix_market_from_bufread(&mut bufreader).unwrap().to_csr()
+                let mat = sprs::io::read_matrix_market_from_bufread(&mut bufreader).unwrap();
+                if transpose_input {
+                    mat.transpose_view().to_csr()
+                } else {
+                    mat.to_csr()
+                }
             },
         }
     };
@@ -74,18 +94,45 @@ pub fn flatten<T>(nested: Vec<Vec<T>>) -> Vec<T> {
     nested.into_iter().flatten().collect()
 }
 
-// TODO fix this for n-dimensional (currently 1D only)
 #[inline(always)]
 #[allow(dead_code)]
-pub fn pattern_to_uwc(pattern: &Pattern) -> Uwc {
-    let (n, i, j) = pattern;
+pub fn metapattern_to_hyperrectangle_uwc(metapattern_id: i32, meta_patterns: &LinkedHashMap<i32, MetaPattern>) -> Uwc {
+    let (_, order, _) = meta_patterns.get(&metapattern_id).unwrap();
 
-    let it_range = n-1;
+    // DEBUG VALUES
+    // let order: i32 = 4;
+    // let order = &order;
 
-    // TODO fix here for n-dimensional (currently 1D only)
-    let u = vec![ vec![-1], vec![1] ];
-    let w = vec![ it_range, 0 ];
-    let c = vec![ *i, *j ];
+    // Create U values
+    let mut u: Vec<Vec<i32>> = vec![vec![0;*order as usize];*order as usize * 2];
+    let (u_top, u_bottom) = u.split_at_mut(*order as usize);
+
+    for idx in 0..*order {
+        *(*u_top.get_mut(idx as usize).unwrap()).get_mut((idx) as usize).unwrap() = -1;
+        *(*u_bottom.get_mut(idx as usize).unwrap()).get_mut((idx) as usize).unwrap() = 1;
+    }
+
+    // println!("[DEBUG] u = {:?}", u);
+
+    let mut w: Vec<i32> = vec![0;*order as usize * 2];
+    let mut c: Vec<i32> = Vec::with_capacity(*order as usize * 2);
+
+    let mut curr_id = metapattern_id;
+    for idx in 0..*order {
+        let ((n,i,j),_, subpat) = meta_patterns.get(&curr_id).unwrap();
+        *w.get_mut(idx as usize).unwrap() = *n-1;
+
+        c.push(*i);
+        c.push(*j);
+
+        curr_id = subpat.unwrap_or_default(); // The last one will never be accessed
+
+        // DEBUG
+        // curr_id = curr_id+1;
+    }
+
+    // println!("[DEBUG] w = {:?}", w);
+    // println!("[DEBUG] c = {:?}", c);
 
     return (u, w, c);
 }
@@ -106,7 +153,7 @@ fn convex_hull_1d(_u: &Vec<Vec<i32>>, w: &Vec<i32>, _dense: bool) -> Vec<Vec<i32
 
 #[inline(always)]
 #[allow(dead_code)]
-pub fn convex_hull_rectangle_nd(u: &Vec<Vec<i32>>, w: &Vec<i32>, dense: bool) -> Vec<Vec<i32>> {
+pub fn convex_hull_hyperrectangle_nd(u: &Vec<Vec<i32>>, w: &Vec<i32>, dense: bool) -> Vec<Vec<i32>> {
     // This code only works for u values like [[-1,0],[0,-1],[1,0],[0,1]]. No values other than 1, 0 or -1 are accepted to this point
 
     let dims = u[0].len();

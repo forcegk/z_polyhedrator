@@ -40,7 +40,7 @@ Debug and release builds are located inside the `target` folder, like below. Nee
 
 ### Command line options
 Help on command line options can be obtained by adding `--help` to the cmdline. A sample (and not necessarilly updated) help output is as below:
-```bash
+```
 ./target/release/matrix_rs --help
 ARGS:
     <patterns_file_path>
@@ -53,17 +53,35 @@ OPTIONS:
     --print-pattern-list
       Print patterns parsed from pattern list
 
+    --print-ast-list
+      Print 1D piece list (AST list) before any dimensionality augmentation
+
+    --print-uwc-list
+      Print uwc and distinct uwc lists after dimensionality augmentation
+
+    -ti, --transpose-input
+      Transpose matrix at input
+
+    -to, --transpose-output
+      Transpose matrix at output
+
     --search-flags <search_flags>
       [2D SEARCH] Search Flags. Valid options: {[PatternFirst], CellFirst} where [] = default.
 
     -w, --write-spf <output_spf_file_path>
       Write to custom SPF file. By default writes to matrix_market_file.mtx.spf
 
-    --print-ast-list
-      Print piece list (AST list)
+    -a, --augment-dimensionality <augment_dimensionality>
+      Augment dimensionality
 
-    --print-uwc-list
-      Print uwc lists
+    -pl, --augment-dimensionality-piece-cutoff <augment_dimensionality_piece_cutoff>
+      Minimum piece length for dimensionality augmentation
+
+    -psmin, --augment-dimensionality-piece-stride-min <augment_dimensionality_piece_stride_min>
+      Min stride for augment dimensionality search
+
+    -psmax, --augment-dimensionality-piece-stride-max <augment_dimensionality_piece_stride_max>
+      Max stride for augment dimensionality search
 
     -h, --help
       Prints help information.
