@@ -77,7 +77,10 @@ OPTIONS:
     -pl, --augment-dimensionality-piece-cutoff <augment_dimensionality_piece_cutoff>
       Minimum piece length for dimensionality augmentation
 
-    -ps, --augment-dimensionality-piece-stride <augment_dimensionality_piece_stride>
+    -psmin, --augment-dimensionality-piece-stride-min <augment_dimensionality_piece_stride_min>
+      Min stride for augment dimensionality search
+
+    -psmax, --augment-dimensionality-piece-stride-max <augment_dimensionality_piece_stride_max>
       Max stride for augment dimensionality search
 
     -h, --help
