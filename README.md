@@ -25,7 +25,7 @@ cargo build --release
 
 Optionally, to compile to the C equivalent of `-march=native` compilation must be performed with these flags set:
 ```bash
-RUSTFLAGS="-C target-cpu=native" cargo build --release
+RUSTFLAGS=""-C opt-level=3 -C target-cpu=native" cargo build --release
 ```
 
 ## Usage
