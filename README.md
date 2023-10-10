@@ -25,8 +25,13 @@ cargo build --release
 
 Optionally, to compile to the C equivalent of `-march=native` compilation must be performed with these flags set:
 ```bash
-RUSTFLAGS=""-C opt-level=3 -C target-cpu=native" cargo build --release
+RUSTFLAGS="-C opt-level=3 -C target-cpu=native" cargo build --release
 ```
+Whereas the PowerShell equivalent would be:
+```powershell
+$env:RUSTFLAGS = "-C opt-level=3 -C target-cpu=native"; cargo build --release
+```
+
 
 ## Usage
 Debug and release builds are located inside the `target` folder, like below. Needless to say, release builds must be used if good speed is desired, as in this case tend to perform around 20 to 100 times faster.
