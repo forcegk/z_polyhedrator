@@ -53,8 +53,6 @@ pub fn read_matrix_market_csr<
 
                 let py_stdout = String::from_utf8(cmd_output.stdout).unwrap();
 
-                print!("{}", py_stdout);
-                
                 let streader = StringReader::new(&py_stdout);
                 let mut bufreader = BufReader::new(streader);
 

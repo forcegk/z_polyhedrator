@@ -1,6 +1,6 @@
 use std::{fs::{File, self}, path::PathBuf, io::{SeekFrom, Seek}, collections::HashMap};
 
-use byteorder::{WriteBytesExt, LittleEndian};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use linked_hash_set::LinkedHashSet;
@@ -102,6 +102,9 @@ impl SPFGen {
         self.meta_pattern_pieces.iter().for_each(|(_, id)| {
             let (u,w,c) = metapattern_to_hyperrectangle_uwc(*id, &self.meta_patterns);
             print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(&u, &w) } else { "\n".to_string() } });
+
+            // let ch = convex_hull_hyperrectangle_nd(&u, &w, false);
+            // println!("Convex Hull: {:?}", ch);
         });
     }
 
@@ -110,6 +113,9 @@ impl SPFGen {
         self.meta_patterns.iter().for_each(|(id, _)| {
             let (u,w,c) = metapattern_to_hyperrectangle_uwc(*id, &self.meta_patterns);
             print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(&u, &w) } else { "\n".to_string() } });
+
+            // let ch = convex_hull_hyperrectangle_nd(&u, &w, false);
+            // println!("Convex Hull: {:?}", ch);
         });
     }
 
@@ -222,7 +228,7 @@ impl SPFGen {
             file.write_i16::<LittleEndian>(u[0].len() as i16).unwrap();
             // println!("    - Dimension of i_p = {}", u[0].len());
 
-            // Get convex_hull (FIXME: Current dimensionality == 1 so dense ch == non-dense ch. Therefore:)
+            // Get convex_hull FIXED for n-dimensional hyperrectangles
             let ch: Vec<Vec<i32>> = convex_hull_hyperrectangle_nd(&u, &w, false);
 
             // Write minimal point
@@ -378,6 +384,97 @@ impl SPFGen {
             }
         });
     }
+
+    fn read_spf (&self, input_spf_file_path: &str, output_csx_file_path: &str, csr: bool) {
+        let mut file = File::open(input_spf_file_path).expect(format!("Unable to open spf file {}", input_spf_file_path).as_str());
+
+        // Read header
+        let nnz = file.read_i32::<LittleEndian>().unwrap();
+        let inc_nnz = file.read_i32::<LittleEndian>().unwrap();
+        let nrows = file.read_i32::<LittleEndian>().unwrap();
+        let ncols = file.read_i32::<LittleEndian>().unwrap();
+
+        // Create sprs triplet matrix for insertion
+        // let mut triplet_matrix: TriMat<f64> = TriMat::new((nrows as usize, ncols as usize));
+        // initialize three vecs with capacity nnz
+
+        let dims = file.read_i16::<LittleEndian>().unwrap();
+        if dims != 2 {
+            panic!("Only 2D matrices are supported at the moment");
+        }
+
+        let num_shapes = file.read_i32::<LittleEndian>().unwrap();
+        let num_hier_shapes = file.read_i32::<LittleEndian>().unwrap();
+
+        let data_ptr = file.read_i32::<LittleEndian>().unwrap();
+
+        let max_dims = file.read_i16::<LittleEndian>().unwrap();
+        // Skip max_dims data
+        file.seek(SeekFrom::Current((32/8)*(max_dims as i64))).unwrap();
+
+        let mut rowvec: Vec<i32> = Vec::with_capacity(nnz as usize);
+        let mut colvec: Vec<i32> = Vec::with_capacity(nnz as usize);
+        let mut datavec: Vec<f64> = Vec::with_capacity(nnz as usize);
+
+        //                      shape_id, dim_of_ip, c
+        let mut shapes_vec: Vec<(i16, i16, Vec<i32>)> = Vec::with_capacity(num_shapes as usize);
+
+        for _ in 0..(num_shapes as usize) {
+            // Read shapes
+            // shapes_vec[shape_id].0 = 
+            
+            let l_shape_id = file.read_i16::<LittleEndian>().unwrap();
+    
+            let type_of_encoding = file.read_i16::<LittleEndian>().unwrap();
+            if type_of_encoding != 0 {
+                panic!("Only vertex_rec encoding is supported at the moment");
+            }
+    
+            // shapes_vec[shape_id].1
+            
+            let l_dim_of_ip = file.read_i16::<LittleEndian>().unwrap();
+    
+            // for i in 0..dim_of_ip {
+            //     // let min_point = file.read_i32::<LittleEndian>().unwrap();
+            //     // let len_along_axis = file.read_i32::<LittleEndian>().unwrap();
+            //     // let stride = file.read_i32::<LittleEndian>().unwrap();
+            // }
+            // Skip min_point, len_along_axis and stride
+            file.seek(SeekFrom::Current((32/8)*3*(l_dim_of_ip as i64))).unwrap();
+
+            // read 2*dim_of_ip c values into shapes_vec[shape_id].2
+            let mut l_c: Vec<i32> = Vec::with_capacity(2*l_dim_of_ip as usize);
+            for _ in 0..2*l_dim_of_ip {
+                l_c.push(file.read_i32::<LittleEndian>().unwrap());
+            }
+
+            shapes_vec.push((l_shape_id, l_dim_of_ip, l_c));
+        }
+
+        // Read total number of origins
+        let num_origins = file.read_i32::<LittleEndian>().unwrap();
+
+        for _ in 0..num_origins {
+            let shape_id = file.read_i16::<LittleEndian>().unwrap();
+            let base_row = file.read_i32::<LittleEndian>().unwrap();
+            let base_col = file.read_i32::<LittleEndian>().unwrap();
+            // skip data offset
+            file.seek(SeekFrom::Current(32/8)).unwrap();
+
+            // traverse row and col from l_row and l_col, and push index into rowvec and colvec
+            // [...]
+        }
+
+
+        
+
+
+        
+
+
+    }
+
+        
 }
 
 #[inline(always)]
