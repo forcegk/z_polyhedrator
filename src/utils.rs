@@ -122,6 +122,9 @@ pub fn metapattern_to_hyperrectangle_uwc(metapattern_id: i32, meta_patterns: &Li
         let ((n,i,j),_, subpat) = meta_patterns.get(&curr_id).unwrap();
         *w.get_mut(idx as usize).unwrap() = *n-1;
 
+        // print i and j
+        println!("DEBUG -- i,j = ({},{})", i, j);
+
         c.push(*i);
         c.push(*j);
 
