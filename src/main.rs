@@ -72,8 +72,14 @@ mod flags {
                 /// Input SPF file
                 required input_spf_file_path: PathBuf
 
-                /// Output CSR file
-                required output_csr_file_path: PathBuf
+                /// Output mtx file
+                required output_mtx_file_path: PathBuf
+
+                /// Output in csc format (default)
+                optional --csc
+
+                /// Output in csr format 
+                optional --csr
             }
         }
     }
@@ -181,11 +187,11 @@ fn main() {
 
                 flags::Matrix_rsCmd::Convert(flags) => {
                     let input_spf_file_path = flags.input_spf_file_path.to_str().unwrap();
-                    let output_csr_file_path = flags.output_csr_file_path.to_str().unwrap();
+                    let output_mtx_file_path = flags.output_mtx_file_path.to_str().unwrap();
 
                     println!("DEBUG MODE!");
 
-                    spfgen::read_spf(input_spf_file_path, output_csr_file_path, true);
+                    spfgen::read_spf(input_spf_file_path, output_mtx_file_path, flags.csr && !flags.csc);
 
                     // panic!("Convert subcommand not implemented yet!");
                 }
@@ -193,7 +199,7 @@ fn main() {
         }
         Err(e) => {
             eprintln!("{}", e);
-            exit(-1);
+            exit(0);
         }
     }
 }

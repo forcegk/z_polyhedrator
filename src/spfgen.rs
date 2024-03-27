@@ -261,10 +261,10 @@ impl SPFGen {
                     file.write_i32::<LittleEndian>(cc).unwrap();
                 }
             } else {
-                let (c_high, c_low) = c.split_at(c.len()/2);
-
-                for cc in c_low.into_iter().chain(c_high.into_iter()) {
-                    file.write_i32::<LittleEndian>(*cc).unwrap();
+                // BUGFIX FOR TRANSPOSING. If the array is [0,1,2,3,4,5], it must write [1,0,3,2,5,4]
+                for (a,b) in c.iter().tuples() {
+                    file.write_i32::<LittleEndian>(*b).unwrap();
+                    file.write_i32::<LittleEndian>(*a).unwrap();
                 }
             }
         });
@@ -391,7 +391,7 @@ impl SPFGen {
     }
 }
 
-pub fn read_spf (input_spf_file_path: &str, output_csx_file_path: &str, csr: bool) {
+pub fn read_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: bool) {
     let mut file = File::open(input_spf_file_path).expect(format!("Unable to open spf file {}", input_spf_file_path).as_str());
 
     // Read header
@@ -406,7 +406,9 @@ pub fn read_spf (input_spf_file_path: &str, output_csx_file_path: &str, csr: boo
     }
 
     let num_shapes = file.read_i32::<LittleEndian>().unwrap();
-    let num_hier_shapes = file.read_i32::<LittleEndian>().unwrap();
+    // skip num_hier_shapes
+    file.seek(SeekFrom::Current(32/8)).unwrap();
+    // let num_hier_shapes = file.read_i32::<LittleEndian>().unwrap();
 
     // Pointer to start of data
     let data_ptr = file.read_i32::<LittleEndian>().unwrap();
@@ -422,8 +424,8 @@ pub fn read_spf (input_spf_file_path: &str, output_csx_file_path: &str, csr: boo
     let mut colvec: Vec<i32> = Vec::with_capacity(nnz as usize);
     let mut datavec: Vec<f64> = Vec::with_capacity(nnz as usize);
 
-    //                       shape_id, (dim_of_ip, c)
-    let mut shapes_map: HashMap<i16, (i16, Vec<i32>)> = HashMap::with_capacity(num_shapes as usize);
+    //                       shape_id, (dim_of_ip, lengths_along_axis, c)
+    let mut shapes_map: HashMap<i16, (i16, Vec<i32>, Vec<i32>)> = HashMap::with_capacity(num_shapes as usize);
 
     for _ in 0..(num_shapes as usize) {
         // Read shapes
@@ -445,8 +447,17 @@ pub fn read_spf (input_spf_file_path: &str, output_csx_file_path: &str, csr: boo
         //     // let len_along_axis = file.read_i32::<LittleEndian>().unwrap();
         //     // let stride = file.read_i32::<LittleEndian>().unwrap();
         // }
-        // Skip min_point, len_along_axis and stride
-        file.seek(SeekFrom::Current((32/8)*3*(l_dim_of_ip as i64))).unwrap();
+        // Skip min_point
+        file.seek(SeekFrom::Current((32/8)*(l_dim_of_ip as i64))).unwrap();
+
+        // Read len_along_axis
+        let mut l_len_along_axis: Vec<i32> = Vec::with_capacity(l_dim_of_ip as usize);
+        for _ in 0..l_dim_of_ip {
+            l_len_along_axis.push(file.read_i32::<LittleEndian>().unwrap());
+        }
+
+        // Skip stride
+        file.seek(SeekFrom::Current((32/8)*(l_dim_of_ip as i64))).unwrap();
 
         // read 2*dim_of_ip c values into shapes_vec[shape_id].2
         let mut l_c: Vec<i32> = Vec::with_capacity(2*l_dim_of_ip as usize);
@@ -454,32 +465,33 @@ pub fn read_spf (input_spf_file_path: &str, output_csx_file_path: &str, csr: boo
             l_c.push(file.read_i32::<LittleEndian>().unwrap());
         }
 
-        shapes_map.insert(l_shape_id,(l_dim_of_ip, l_c));
+        shapes_map.insert(l_shape_id,(l_dim_of_ip, l_len_along_axis, l_c));
     }
 
     // Read total number of origins
     let num_origins = file.read_i32::<LittleEndian>().unwrap();
-    let mut data_offset: i32 = 0;
+    // let mut data_offset: i32 = 0;
 
     for _ in 0..num_origins {
         let shape_id = file.read_i16::<LittleEndian>().unwrap();
         let base_row = file.read_i32::<LittleEndian>().unwrap();
         let base_col = file.read_i32::<LittleEndian>().unwrap();
-        // Read data offset as the num of elements. We can calculate this, but this is easier
-        data_offset = file.read_i32::<LittleEndian>().unwrap() - data_offset;
+        // skip reading data_offset
+        file.seek(SeekFrom::Current(32/8)).unwrap();
 
-        let curr_pos = file.seek(SeekFrom::Current(0)).unwrap();
+        // NO NEED TO JUMP TO DATA OFFSET, AS WE READ IT ALL TOGETHER AT THE END. WE JUST POPULATE ROW AND COL VECTORS
+        // Read data offset as the num of elements. We can calculate this, but this is easier
+        // data_offset = file.read_i32::<LittleEndian>().unwrap() - data_offset;
+        // let curr_pos = file.seek(SeekFrom::Current(0)).unwrap();
+        // file.seek(SeekFrom::Start(data_ptr as u64 + data_offset as u64)).unwrap();
 
         // traverse row and col from l_row and l_col, and push index into rowvec and colvec
-        // [...]
-        let (l_dim_of_ip, l_c) = shapes_map.get(&shape_id).unwrap();
-        // TODO CONTINUE
+        let (l_dim_of_ip, l_len_along_axis, l_c) = shapes_map.get(&shape_id).unwrap();
 
-
-
+        recursive_populate_row_col_vec(*l_dim_of_ip, l_len_along_axis, l_c, &mut rowvec, &mut colvec, base_row, base_col);
 
         // Return to previous position
-        file.seek(SeekFrom::Start(curr_pos)).unwrap();
+        // file.seek(SeekFrom::Start(curr_pos)).unwrap();
     }
 
     // Read uninc_format
@@ -514,11 +526,59 @@ pub fn read_spf (input_spf_file_path: &str, output_csx_file_path: &str, csr: boo
                 for _ in 0..nnz-inc_nnz {
                     colvec.push(file.read_i32::<LittleEndian>().unwrap());
                 }
-
-                println!("DEBUG -- rowvec = {:?}", rowvec);
-                println!("DEBUG -- colvec = {:?}", colvec);
              },
         _ => { panic!("The hell you did here man") }
+    }
+    
+    // seek to data_ptr
+    file.seek(SeekFrom::Start(data_ptr as u64)).unwrap();
+
+    // Read data
+    for _ in 0..nnz {
+        datavec.push(file.read_f64::<LittleEndian>().unwrap());
+    }
+
+    println!("DEBUG -- rowvec = {:?}", rowvec);
+    println!("DEBUG -- colvec = {:?}", colvec);
+    println!("DEBUG -- datavec = {:?}", datavec);
+    println!("DEBUG -- lengths (row,col,data) = {:?}, nnz = {:?}", (rowvec.len(), colvec.len(), datavec.len()), nnz);
+
+    // Create sprs matrix with row_idx, col_idx and data vectors
+    let mut mat = TriMat::new((nrows as usize, ncols as usize));
+    for ((row,col), data) in rowvec.iter().zip(colvec.iter()).zip(datavec.iter()) {
+        mat.add_triplet(*row as usize, *col as usize, *data);
+    }
+
+    let csx_matrix: CsMat<f64>;
+    if csr {
+        csx_matrix = mat.to_csr();
+    } else {
+        csx_matrix = mat.to_csc();
+    }
+
+    // Write matrix to file
+    sprs::io::write_matrix_market(output_mtx_file_path, &csx_matrix).unwrap();
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+fn recursive_populate_row_col_vec(l_dim_of_ip: i16, l_len_along_axis: &[i32], l_c: &[i32], rowvec: &mut Vec<i32>, colvec: &mut Vec<i32>, base_row: i32, base_col: i32) {
+
+    println!("DEBUG -- l_dim_of_ip = {}, l_len_along_axis = {:?}, l_c = {:?}, base_row = {}, base_col = {}", l_dim_of_ip, l_len_along_axis, l_c, base_row, base_col);
+
+    if l_dim_of_ip < 2 /* l_dim_of_ip == 1 basically */ {
+        for ii in 0..=l_len_along_axis[0] {
+            rowvec.push(base_row + (l_c[0] * ii));
+            colvec.push(base_col + (l_c[1] * ii));
+        }
+    } else {
+        for ii in 0..=l_len_along_axis[0] {
+            recursive_populate_row_col_vec(
+                l_dim_of_ip-1, &l_len_along_axis[1..], &l_c[2..], rowvec, colvec,
+                base_row + (l_c[0] * ii),
+                base_col + (l_c[1] * ii)
+            )
+        }
     }
 }
 

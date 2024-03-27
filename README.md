@@ -4,7 +4,9 @@
 
 ## Installation
 
-You will need the latest version of the [rust toolchain](https://rustup.rs) to compile matrix_rs. To use the python utils you will also need [python3(.11.2)](https://www.python.org/downloads/) installed and in the $PATH, along with all packages from `utils/requirements.txt` installed.
+You will need the latest version of the [rust toolchain](https://rustup.rs) to compile matrix_rs. Following the [Arch Linux philosophy](https://wiki.archlinux.org/title/Arch_Linux#Modernity), unless said in this README, only the latest version of the rust toolchain is supported. To use the python utils you will also need [python3(.11.2)](https://www.python.org/downloads/) installed and in the $PATH, along with all packages from `utils/requirements.txt` installed.
+
+Before opening an Issue, check that your rust toolchain is updated (`rustup update`), and both your `python` distribution alongside with its `pip` packages are too.
 
 ### Debug build
 To build the debug version the next command can be run
@@ -47,14 +49,24 @@ Debug and release builds are located inside the `target` folder, like below. Nee
 Help on command line options can be obtained by adding `--help` to the cmdline. A sample (and not necessarilly updated) help output is as below:
 ```
 ./target/release/matrix_rs --help
-ARGS:
+matrix_rs
+
+OPTIONS:
+    -h, --help
+      Prints help information.
+
+SUBCOMMANDS:
+
+matrix_rs search
+
+  ARGS:
     <patterns_file_path>
       File containing pattern list
 
     <matrixmarket_file_path>
       Input MatrixMarket file
 
-OPTIONS:
+  OPTIONS:
     --print-pattern-list
       Print patterns parsed from pattern list
 
@@ -88,36 +100,57 @@ OPTIONS:
     -psmax, --augment-dimensionality-piece-stride-max <augment_dimensionality_piece_stride_max>
       Max stride for augment dimensionality search
 
-    -h, --help
-      Prints help information.
+
+matrix_rs convert
+
+  ARGS:
+    <input_spf_file_path>
+      Input SPF file
+
+    <output_mtx_file_path>
+      Output mtx file
+
+  OPTIONS:
+    --csc
+      Output in csc format (default)
+
+    --csr
+      Output in csr format
+
 ```
 
 ### Example
 If let's say, we wanted to execute `matrix_rs` for `Maragal_1` sparse matrix, the command would be as follows:
 ```bash
 # While on a coding and/or debugging environment
-cargo run -- ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
+cargo run -- search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
 
 # Looking for performance
-./target/release/matrix_rs.exe ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
+./target/release/matrix_rs.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
 ```
 
 However, you will notice that these commands produce no output. Some frequent use cases can be:
 
 #### Printing AST list
 ```bash
-./target/release/matrix_rs.exe ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx --print-ast-list
+./target/release/matrix_rs.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx --print-ast-list
 ```
 
 #### Writing to SPF file
 ```bash
-./target/release/matrix_rs.exe ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf
+./target/release/matrix_rs.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf
 ```
 
 #### Mixed usage
 Needless to say, flags can be combined unless explicitly said. For example, in order to obtain more information about the data transformation process, several flags can be specified at the same time.
 ```bash
-./target/release/matrix_rs.exe ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf --print-ast-list --print-uwc-list --print-pattern-list
+./target/release/matrix_rs.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf --print-ast-list --print-uwc-list --print-pattern-list
+```
+
+#### Converting SPF to MatrixMarket
+You may want to go the other way around. You can do so with the convert subcommand.
+```bash
+./target/release/matrix_rs.exe convert ./impcol_2.2d.spf output_impcol_2.mtx
 ```
 
 ## Contributing
@@ -125,4 +158,4 @@ Pull requests are welcome. For major changes, please open an issue first
 to discuss what you would like to change.
 
 ## License
-[TO BE DECIDED](https://www.youtube.com/watch?v=SEGLhUZRZdY)
+[TO BE DECIDED. All Rights Reserved for now](https://www.youtube.com/watch?v=SEGLhUZRZdY)
