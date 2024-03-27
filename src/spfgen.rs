@@ -420,8 +420,8 @@ pub fn read_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: boo
     // Create sprs triplet matrix for insertion
     // let mut triplet_matrix: TriMat<f64> = TriMat::new((nrows as usize, ncols as usize));
     // initialize three vecs with capacity nnz
-    let mut rowvec: Vec<i32> = Vec::with_capacity(nnz as usize);
-    let mut colvec: Vec<i32> = Vec::with_capacity(nnz as usize);
+    let mut rowvec: Vec<usize> = Vec::with_capacity(nnz as usize);
+    let mut colvec: Vec<usize> = Vec::with_capacity(nnz as usize);
     let mut datavec: Vec<f64> = Vec::with_capacity(nnz as usize);
 
     //                       shape_id, (dim_of_ip, lengths_along_axis, c)
@@ -506,12 +506,12 @@ pub fn read_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: boo
                 for curr_row in 0..nrows {
                     let row_cnt = file.read_i32::<LittleEndian>().unwrap();
                     // Insert row_cnt - last_row_cnt, curr_row values into rowvec
-                    rowvec.extend(vec![curr_row; (row_cnt - last_row_cnt) as usize]);
+                    rowvec.extend(vec![curr_row as usize; (row_cnt - last_row_cnt) as usize]);
                     last_row_cnt = row_cnt;
                 }
                 // Read colidx
                 for _ in 0..nnz-inc_nnz {
-                    colvec.push(file.read_i32::<LittleEndian>().unwrap());
+                    colvec.push(file.read_i32::<LittleEndian>().unwrap() as usize);
                 }
 
                 println!("DEBUG -- rowvec = {:?}", rowvec);
@@ -520,11 +520,11 @@ pub fn read_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: boo
         2 => {  eprintln!("Reading COO");
                 // Read rowptr
                 for _ in 0..nnz-inc_nnz {
-                    rowvec.push(file.read_i32::<LittleEndian>().unwrap());
+                    rowvec.push(file.read_i32::<LittleEndian>().unwrap() as usize);
                 }
                 // Read colptr
                 for _ in 0..nnz-inc_nnz {
-                    colvec.push(file.read_i32::<LittleEndian>().unwrap());
+                    colvec.push(file.read_i32::<LittleEndian>().unwrap() as usize);
                 }
              },
         _ => { panic!("The hell you did here man") }
@@ -543,17 +543,13 @@ pub fn read_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: boo
     println!("DEBUG -- datavec = {:?}", datavec);
     println!("DEBUG -- lengths (row,col,data) = {:?}, nnz = {:?}", (rowvec.len(), colvec.len(), datavec.len()), nnz);
 
-    // Create sprs matrix with row_idx, col_idx and data vectors
-    let mut mat = TriMat::new((nrows as usize, ncols as usize));
-    for ((row,col), data) in rowvec.iter().zip(colvec.iter()).zip(datavec.iter()) {
-        mat.add_triplet(*row as usize, *col as usize, *data);
-    }
+    let coo_mat = TriMat::from_triplets((nrows as usize,ncols as usize), rowvec, colvec, datavec);
 
     let csx_matrix: CsMat<f64>;
     if csr {
-        csx_matrix = mat.to_csr();
+        csx_matrix = coo_mat.to_csr();
     } else {
-        csx_matrix = mat.to_csc();
+        csx_matrix = coo_mat.to_csc();
     }
 
     // Write matrix to file
@@ -562,14 +558,14 @@ pub fn read_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: boo
 
 #[inline(always)]
 #[allow(dead_code)]
-fn recursive_populate_row_col_vec(l_dim_of_ip: i16, l_len_along_axis: &[i32], l_c: &[i32], rowvec: &mut Vec<i32>, colvec: &mut Vec<i32>, base_row: i32, base_col: i32) {
+fn recursive_populate_row_col_vec(l_dim_of_ip: i16, l_len_along_axis: &[i32], l_c: &[i32], rowvec: &mut Vec<usize>, colvec: &mut Vec<usize>, base_row: i32, base_col: i32) {
 
     println!("DEBUG -- l_dim_of_ip = {}, l_len_along_axis = {:?}, l_c = {:?}, base_row = {}, base_col = {}", l_dim_of_ip, l_len_along_axis, l_c, base_row, base_col);
 
     if l_dim_of_ip < 2 /* l_dim_of_ip == 1 basically */ {
         for ii in 0..=l_len_along_axis[0] {
-            rowvec.push(base_row + (l_c[0] * ii));
-            colvec.push(base_col + (l_c[1] * ii));
+            rowvec.push((base_row + (l_c[0] * ii)) as usize);
+            colvec.push((base_col + (l_c[1] * ii)) as usize);
         }
     } else {
         for ii in 0..=l_len_along_axis[0] {
