@@ -123,7 +123,7 @@ pub fn metapattern_to_hyperrectangle_uwc(metapattern_id: i32, meta_patterns: &Li
         *w.get_mut(idx as usize).unwrap() = *n-1;
 
         // print i and j
-        println!("DEBUG -- i,j = ({},{})", i, j);
+        // println!("DEBUG -- i,j = ({},{})", i, j);
 
         c.push(*i);
         c.push(*j);

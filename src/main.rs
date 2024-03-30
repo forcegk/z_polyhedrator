@@ -1,7 +1,9 @@
 extern crate sprs;
 extern crate text_io;
 
+use std::io::Write;
 use std::process::exit;
+use std::time::Instant;
 use colored::Colorize;
 
 mod spsearch;
@@ -102,11 +104,14 @@ fn main() {
                         }
                     };
 
+                    let mut search_flags_str: String = "[default]".to_string();
+
                     let search_flags = {
                         let mut l_search_flags = spsearch::SpSearchPatternsFlags::NoFlags;
 
                         if flags.search_flags.is_some() {
-                            match flags.search_flags.unwrap().as_str() {
+                            search_flags_str = flags.search_flags.unwrap().to_string();
+                            match search_flags_str.as_str() {
                                 "PatternFirst" => l_search_flags |= spsearch::SpSearchPatternsFlags::PatternFirst,
                                 "CellFirst" => l_search_flags |= spsearch::SpSearchPatternsFlags::CellFirst,
                                 def => {
@@ -123,42 +128,51 @@ fn main() {
 
                     /* -------- PARSE -------- */
                     eprintln!("{} Opening matrixmarket file: {}", "[INFO]".cyan().bold(), matrixmarket_file_path);
+                    std::io::stderr().flush().unwrap();
+                    let now = Instant::now();
+
                     let mut base_matrix: SpSearchMatrix = SpSearchMatrix::from_file(matrixmarket_file_path, flags.transpose_input);
 
+                    let elapsed = now.elapsed();
+                    println!("{} Opening matrixmarket file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), matrixmarket_file_path, elapsed.as_secs(), elapsed.subsec_millis());
+                    std::io::stderr().flush().unwrap();
+
                     eprintln!("{} Opening patterns file: {}", "[INFO]".cyan().bold(), patterns_file_path);
+                    std::io::stderr().flush().unwrap();
+                    let now = Instant::now();
+
                     base_matrix.load_patterns(patterns_file_path);
 
+                    let elapsed = now.elapsed();
+                    println!("{} Opening patterns file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), patterns_file_path, elapsed.as_secs(), elapsed.subsec_millis());
+                    std::io::stderr().flush().unwrap();
 
                     if flags.print_pattern_list {
                         eprintln!("--- Pattern list ---");
                         base_matrix.print_patterns();
                     }
 
+                    /* -------- SEARCH -------- */
+                    eprintln!("{} Searching for patterns with flags {}... ", "[INFO]".cyan().bold(), search_flags_str);
+                    std::io::stderr().flush().unwrap();
+                    let now = Instant::now();
+
                     base_matrix.search_patterns(search_flags);
 
+                    let elapsed = now.elapsed();
+                    println!("{} Searching for patterns with flags {} took: {}.{:03} seconds", "[TIME]".green().bold(), search_flags_str, elapsed.as_secs(), elapsed.subsec_millis());
+                    std::io::stderr().flush().unwrap();
+
+                    /* -------- PRINT AST LIST IF REQUIRED -------- */
                     if flags.print_ast_list {
                         base_matrix.print_pieces();
                     }
 
-                    let augment_dimensionality: usize = match flags.augment_dimensionality {
-                        Some(x) => x,
-                        None => 1usize,
-                    };
-
-                    let augment_dimensionality_piece_cutoff: usize = match flags.augment_dimensionality_piece_cutoff {
-                        Some(x) => x,
-                        None => 2usize,
-                    };
-
-                    let augment_dimensionality_piece_stride_max: usize = match flags.augment_dimensionality_piece_stride_max {
-                        Some(x) => x,
-                        None => std::usize::MAX,
-                    };
-
-                    let augment_dimensionality_piece_stride_min: usize = match flags.augment_dimensionality_piece_stride_min {
-                        Some(x) => x,
-                        None => 0usize,
-                    };
+                    /* -------- AUGMENT DIMENSIONALITY AND WRITE SPF FILE IF REQUIRED -------- */
+                    let augment_dimensionality: usize = flags.augment_dimensionality.unwrap_or(1);
+                    let augment_dimensionality_piece_cutoff: usize = flags.augment_dimensionality_piece_cutoff.unwrap_or(2);
+                    let augment_dimensionality_piece_stride_max: usize = flags.augment_dimensionality_piece_stride_max.unwrap_or(std::usize::MAX);
+                    let augment_dimensionality_piece_stride_min: usize = flags.augment_dimensionality_piece_stride_min.unwrap_or(0);
 
                     if flags.print_uwc_list || output_spf_file_path.0 || augment_dimensionality > 1 {
                         let mut spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list(), base_matrix.numrows, base_matrix.numcols, base_matrix.nonzeros);
@@ -167,7 +181,16 @@ fn main() {
                         if augment_dimensionality > 1 {
                             // Augment dimensionality
                             spaugment = SpAugment::from_1d_origin_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
+
+                            eprintln!("{} Augmenting dimensionality... ", "[INFO]".cyan().bold());
+                            std::io::stderr().flush().unwrap();
+                            let now = Instant::now();
+
                             spaugment.augment_dimensionality(augment_dimensionality, augment_dimensionality_piece_cutoff, augment_dimensionality_piece_stride_min, augment_dimensionality_piece_stride_max);
+
+                            let elapsed = now.elapsed();
+                            println!("{} Augmenting dimensionality took: {}.{:03} seconds", "[TIME]".green().bold(), elapsed.as_secs(), elapsed.subsec_millis());
+                            std::io::stderr().flush().unwrap();
 
                             // And update spfgen accordingly
                             spfgen = SPFGen::from_metapatterns_list(spaugment.get_metapatterns(), spaugment.get_metapattern_pieces(), spfgen.nrows, spfgen.ncols, spfgen.nnz, spfgen.inc_nnz);
@@ -179,7 +202,15 @@ fn main() {
                         }
 
                         if output_spf_file_path.0 {
+                            eprintln!("{} Writing SPF file... ", "[INFO]".cyan().bold());
+                            std::io::stderr().flush().unwrap();
+                            let now = Instant::now();
+
                             spfgen.write_spf(&matrixmarket_file_path, &format!("{}.{}d.spf", &output_spf_file_path.1, augment_dimensionality), flags.transpose_input, flags.transpose_output);
+
+                            let elapsed = now.elapsed();
+                            println!("{} Writing SPF file took: {}.{:03} seconds", "[TIME]".green().bold(), elapsed.as_secs(), elapsed.subsec_millis());
+                            std::io::stderr().flush().unwrap();
                         }
 
                     }
@@ -189,11 +220,15 @@ fn main() {
                     let input_spf_file_path = flags.input_spf_file_path.to_str().unwrap();
                     let output_mtx_file_path = flags.output_mtx_file_path.to_str().unwrap();
 
-                    println!("DEBUG MODE!");
+                    eprintln!("{} Converting SPF file: {}... ", "[INFO]".cyan().bold(), input_spf_file_path);
+                    std::io::stderr().flush().unwrap();
+                    let now = Instant::now();
 
-                    spfgen::read_spf(input_spf_file_path, output_mtx_file_path, flags.csr && !flags.csc);
+                    spfgen::convert_spf(input_spf_file_path, output_mtx_file_path, flags.csr && !flags.csc);
 
-                    // panic!("Convert subcommand not implemented yet!");
+                    let elapsed = now.elapsed();
+                    // eprintln!("took: {}.{:03} seconds", elapsed.as_secs(), elapsed.subsec_millis());
+                    println!("{} Converting SPF file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), input_spf_file_path, elapsed.as_secs(), elapsed.subsec_millis());
                 }
             }
         }

@@ -102,9 +102,6 @@ impl SPFGen {
         self.meta_pattern_pieces.iter().for_each(|(_, id)| {
             let (u,w,c) = metapattern_to_hyperrectangle_uwc(*id, &self.meta_patterns);
             print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(&u, &w) } else { "\n".to_string() } });
-
-            // let ch = convex_hull_hyperrectangle_nd(&u, &w, false);
-            // println!("Convex Hull: {:?}", ch);
         });
     }
 
@@ -115,12 +112,11 @@ impl SPFGen {
             print!("{:?}\t{:?}\t{:?}\t{:?}{}", id, u, w, c, { if show_eqs { format_eqs(&u, &w) } else { "\n".to_string() } });
 
 
-            // DEBUG TODO REMOVE
-            let ch = convex_hull_hyperrectangle_nd(&u, &w, false);
-            println!("Convex Hull: {:?}", ch);
-
-            let ch = convex_hull_hyperrectangle_nd(&u, &w, true);
-            println!("Dense \"Convex Hull\": {:?}", ch);
+            // DEBUG
+            // let ch = convex_hull_hyperrectangle_nd(&u, &w, false);
+            // println!("DEBUG -- Convex Hull: {:?}", ch);
+            // let ch = convex_hull_hyperrectangle_nd(&u, &w, true);
+            // println!("DEBUG -- Dense \"Convex Hull\": {:?}", ch);
         });
     }
 
@@ -391,7 +387,7 @@ impl SPFGen {
     }
 }
 
-pub fn read_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: bool) {
+pub fn convert_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: bool) {
     let mut file = File::open(input_spf_file_path).expect(format!("Unable to open spf file {}", input_spf_file_path).as_str());
 
     // Read header
@@ -497,11 +493,9 @@ pub fn read_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: boo
     // Read uninc_format
     let uninc_format = file.read_u8().unwrap();
     match uninc_format {
-        0 => {  eprintln!("Reading CSR");
-                // let mut rowptr = vec![];
-                // let mut colidx = vec![];
-
+        0 => {  //eprintln!("Reading CSR");
                 let mut last_row_cnt = file.read_i32::<LittleEndian>().unwrap();
+
                 // Read rowptr
                 for curr_row in 0..nrows {
                     let row_cnt = file.read_i32::<LittleEndian>().unwrap();
@@ -513,11 +507,8 @@ pub fn read_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: boo
                 for _ in 0..nnz-inc_nnz {
                     colvec.push(file.read_i32::<LittleEndian>().unwrap() as usize);
                 }
-
-                println!("DEBUG -- rowvec = {:?}", rowvec);
-                println!("DEBUG -- colvec = {:?}", colvec);
              },
-        2 => {  eprintln!("Reading COO");
+        2 => {  // eprintln!("Reading COO");
                 // Read rowptr
                 for _ in 0..nnz-inc_nnz {
                     rowvec.push(file.read_i32::<LittleEndian>().unwrap() as usize);
@@ -538,10 +529,10 @@ pub fn read_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: boo
         datavec.push(file.read_f64::<LittleEndian>().unwrap());
     }
 
-    println!("DEBUG -- rowvec = {:?}", rowvec);
-    println!("DEBUG -- colvec = {:?}", colvec);
-    println!("DEBUG -- datavec = {:?}", datavec);
-    println!("DEBUG -- lengths (row,col,data) = {:?}, nnz = {:?}", (rowvec.len(), colvec.len(), datavec.len()), nnz);
+    // println!("DEBUG -- rowvec = {:?}", rowvec);
+    // println!("DEBUG -- colvec = {:?}", colvec);
+    // println!("DEBUG -- datavec = {:?}", datavec);
+    // println!("DEBUG -- lengths (row,col,data) = {:?}, nnz = {:?}", (rowvec.len(), colvec.len(), datavec.len()), nnz);
 
     let coo_mat = TriMat::from_triplets((nrows as usize,ncols as usize), rowvec, colvec, datavec);
 
@@ -559,9 +550,6 @@ pub fn read_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: boo
 #[inline(always)]
 #[allow(dead_code)]
 fn recursive_populate_row_col_vec(l_dim_of_ip: i16, l_len_along_axis: &[i32], l_c: &[i32], rowvec: &mut Vec<usize>, colvec: &mut Vec<usize>, base_row: i32, base_col: i32) {
-
-    println!("DEBUG -- l_dim_of_ip = {}, l_len_along_axis = {:?}, l_c = {:?}, base_row = {}, base_col = {}", l_dim_of_ip, l_len_along_axis, l_c, base_row, base_col);
-
     if l_dim_of_ip < 2 /* l_dim_of_ip == 1 basically */ {
         for ii in 0..=l_len_along_axis[0] {
             rowvec.push((base_row + (l_c[0] * ii)) as usize);
