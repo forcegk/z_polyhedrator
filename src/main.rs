@@ -135,7 +135,7 @@ fn main() {
 
                     let elapsed = now.elapsed();
                     println!("{} Opening matrixmarket file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), matrixmarket_file_path, elapsed.as_secs(), elapsed.subsec_millis());
-                    std::io::stderr().flush().unwrap();
+                    std::io::stdout().flush().unwrap();
 
                     eprintln!("{} Opening patterns file: {}", "[INFO]".cyan().bold(), patterns_file_path);
                     std::io::stderr().flush().unwrap();
@@ -145,7 +145,7 @@ fn main() {
 
                     let elapsed = now.elapsed();
                     println!("{} Opening patterns file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), patterns_file_path, elapsed.as_secs(), elapsed.subsec_millis());
-                    std::io::stderr().flush().unwrap();
+                    std::io::stdout().flush().unwrap();
 
                     if flags.print_pattern_list {
                         eprintln!("--- Pattern list ---");
@@ -161,7 +161,7 @@ fn main() {
 
                     let elapsed = now.elapsed();
                     println!("{} Searching for patterns with flags {} took: {}.{:03} seconds", "[TIME]".green().bold(), search_flags_str, elapsed.as_secs(), elapsed.subsec_millis());
-                    std::io::stderr().flush().unwrap();
+                    std::io::stdout().flush().unwrap();
 
                     /* -------- PRINT AST LIST IF REQUIRED -------- */
                     if flags.print_ast_list {
@@ -190,7 +190,7 @@ fn main() {
 
                             let elapsed = now.elapsed();
                             println!("{} Augmenting dimensionality took: {}.{:03} seconds", "[TIME]".green().bold(), elapsed.as_secs(), elapsed.subsec_millis());
-                            std::io::stderr().flush().unwrap();
+                            std::io::stdout().flush().unwrap();
 
                             // And update spfgen accordingly
                             spfgen = SPFGen::from_metapatterns_list(spaugment.get_metapatterns(), spaugment.get_metapattern_pieces(), spfgen.nrows, spfgen.ncols, spfgen.nnz, spfgen.inc_nnz);
@@ -210,7 +210,7 @@ fn main() {
 
                             let elapsed = now.elapsed();
                             println!("{} Writing SPF file took: {}.{:03} seconds", "[TIME]".green().bold(), elapsed.as_secs(), elapsed.subsec_millis());
-                            std::io::stderr().flush().unwrap();
+                            std::io::stdout().flush().unwrap();
                         }
 
                     }
@@ -227,8 +227,8 @@ fn main() {
                     spfgen::convert_spf(input_spf_file_path, output_mtx_file_path, flags.csr && !flags.csc);
 
                     let elapsed = now.elapsed();
-                    // eprintln!("took: {}.{:03} seconds", elapsed.as_secs(), elapsed.subsec_millis());
                     println!("{} Converting SPF file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), input_spf_file_path, elapsed.as_secs(), elapsed.subsec_millis());
+                    std::io::stdout().flush().unwrap();
                 }
             }
         }
