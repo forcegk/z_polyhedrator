@@ -155,7 +155,7 @@ impl SpAugment {
                 // Update dimensionality of current metapattern
                 self.meta_patterns.get_mut(&low_order_id).unwrap().1 = curr_dim as i32;
 
-                // Skip the first one as it is already updated (hashmap propierties)
+                // Skip the first one as it is already updated (hashmap properties)
                 for ii in 1..n {
                     self.meta_pattern_pieces.remove(
                         &((orig_x as i64 + (i as i64 * ii as i64)) as usize, (orig_y as i64 + (j as i64 * ii as i64)) as usize)
@@ -242,28 +242,10 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
     // DEBUG UNCOMMENT
     // println!("Mat = {:?}", expl_matrix);
 
-    let mut best_piece: Piece = (0,0,((piece_cutoff-1) as i32,0,0));
-    let mut found_piece: bool = false;
+    let mut best_piece: Piece;
+    let mut found_piece: bool;
 
     'L1: loop {
-        if found_piece {
-            /*** FIX OCCURRENCES IN LHM ***/
-            let (x,y,(n,i,j)) = best_piece;
-            let remainder;
-            {// scoped so it does not interfere
-                let p = occurrences.get_mut(&(i,j)).unwrap();
-                // add one to account for the creation of an aditional vertex
-                remainder = *p - (n as u32) + 1u32;
-                *p = remainder;
-            }
-
-            // Set to found (true) members of the new pattern
-            for ii in 0..n {
-                let pos_val = expl_matrix.get_mut((x as i64 + (i as i64 * ii as i64)) as usize, (y as i64 + (j as i64 * ii as i64)) as usize).unwrap();
-                *pos_val = true;
-            }
-        }
-
         // Reset best_piece and found_piece
         best_piece = (0,0,((piece_cutoff-1) as i32,0,0));
         found_piece = false;
@@ -317,7 +299,23 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
             }
         } // 'L2
 
-        if !found_piece {
+        if found_piece {
+            /*** FIX OCCURRENCES IN LHM ***/
+            let (x,y,(n,i,j)) = best_piece;
+            let remainder;
+            {// scoped so it does not interfere
+                let p = occurrences.get_mut(&(i,j)).unwrap();
+                // add one to account for the creation of an aditional vertex
+                remainder = *p - (n as u32) + 1u32;
+                *p = remainder;
+            }
+
+            // Set to found (true) members of the new pattern
+            for ii in 0..n {
+                let pos_val = expl_matrix.get_mut((x as i64 + (i as i64 * ii as i64)) as usize, (y as i64 + (j as i64 * ii as i64)) as usize).unwrap();
+                *pos_val = true;
+            }
+        } else {
             break 'L1;
         }
     }
