@@ -176,7 +176,7 @@ You may want to go the other way around. You can do so with the convert subcomma
 ```
 
 ## Main features flowchart
-<p align="center"><a href="https://gac.udc.es" target="_blank"><img src="https://raw.githubusercontent.com/forcegk/matrix_rs/master/doc/img/flowchart/Z-Polyhedrator_Flowchart.svg" width="90%"></a></p>
+<p align="center"><img src="doc/img/flowchart/Z-Polyhedrator_Flowchart.svg" width="75%"></a></p>
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first
