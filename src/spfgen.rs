@@ -715,7 +715,7 @@ pub fn convert_spf_for_timing (input_spf_file_path: &str, output_mtx_file_path: 
     }
     /************************************************************************************************************************/
     let elapsed = now.elapsed();
-    println!("{} Converting SPF file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), input_spf_file_path, elapsed.as_secs(), elapsed.subsec_millis());
+    println!("{} Converting SPF file: {} took: {}.{:09} seconds", "[TIME]".green().bold(), input_spf_file_path, elapsed.as_secs(), elapsed.subsec_nanos());
     std::io::stdout().flush().unwrap();
 
     // Write matrix to file
