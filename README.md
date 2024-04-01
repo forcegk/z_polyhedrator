@@ -1,8 +1,11 @@
-<img src="doc/img/logo/zpolyhedrator_logo.png" align="right" style="width: 250; height: 250px;"/>
+<img src="doc/img/logo/zpolyhedrator_logo.png" align="right" style="width: 200px; height: 200px;"/>
 
 # z_polyhedrator
 
 `z_polyhedrator` is a program for detecting regular patterns provided via a pattern file on sparse matrices.
+
+It works with the Sparse Polyhedral Format (temporary name) and it does it quite fast. It can currently search n-D patterns in sparse matrices, export SPF files, and convert SPF files to MTX back again.
+Soon, it will support reading from Rutherford Boeing files, and much faster on the fly mtx conversion, whenever the Python dependency is removed.
 
 ## Installation
 
