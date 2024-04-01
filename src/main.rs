@@ -176,7 +176,7 @@ fn main() {
                     base_matrix.search_patterns(search_flags);
 
                     let elapsed = now.elapsed();
-                    println!("{} Searching for patterns with flags {} took: {}.{:03} seconds", "[TIME]".green().bold(), search_flags_str, elapsed.as_secs(), elapsed.subsec_millis());
+                    println!("{} Searching for patterns with flags {} took: {}.{:09} seconds", "[TIME]".green().bold(), search_flags_str, elapsed.as_secs(), elapsed.subsec_nanos());
                     std::io::stdout().flush().unwrap();
 
                     /* -------- PRINT AST LIST IF REQUIRED -------- */
