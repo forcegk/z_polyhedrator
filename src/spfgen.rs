@@ -1,6 +1,7 @@
-use std::{fs::{File, self}, path::PathBuf, io::{SeekFrom, Seek}, collections::HashMap};
+use std::{collections::HashMap, fs::{self, File}, io::{Seek, SeekFrom, Write}, path::PathBuf, time::Instant};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use colored::Colorize;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use linked_hash_set::LinkedHashSet;
@@ -520,7 +521,7 @@ pub fn convert_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: 
              },
         _ => { panic!("The hell you did here man") }
     }
-    
+
     // seek to data_ptr
     file.seek(SeekFrom::Start(data_ptr as u64)).unwrap();
 
@@ -542,6 +543,180 @@ pub fn convert_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: 
     } else {
         csx_matrix = coo_mat.to_csc();
     }
+
+    // Write matrix to file
+    sprs::io::write_matrix_market(output_mtx_file_path, &csx_matrix).unwrap();
+}
+
+pub fn convert_spf_for_timing (input_spf_file_path: &str, output_mtx_file_path: &str, csr: bool) {
+    let mut file = File::open(input_spf_file_path).expect(format!("Unable to open spf file {}", input_spf_file_path).as_str());
+
+    // Read header
+    let nnz = file.read_i32::<LittleEndian>().unwrap();
+    let inc_nnz = file.read_i32::<LittleEndian>().unwrap();
+    let nrows = file.read_i32::<LittleEndian>().unwrap();
+    let ncols = file.read_i32::<LittleEndian>().unwrap();
+
+    let dims = file.read_i16::<LittleEndian>().unwrap();
+    if dims != 2 {
+        panic!("Only 2D matrices are supported at the moment");
+    }
+
+    let num_shapes = file.read_i32::<LittleEndian>().unwrap();
+    // skip num_hier_shapes
+    file.seek(SeekFrom::Current(32/8)).unwrap();
+    // let num_hier_shapes = file.read_i32::<LittleEndian>().unwrap();
+
+    // Pointer to start of data
+    let data_ptr = file.read_i32::<LittleEndian>().unwrap();
+
+    let max_dims = file.read_i16::<LittleEndian>().unwrap();
+    // Skip max_dims data
+    file.seek(SeekFrom::Current((32/8)*(max_dims as i64))).unwrap();
+
+    // Create sprs triplet matrix for insertion
+    // let mut triplet_matrix: TriMat<f64> = TriMat::new((nrows as usize, ncols as usize));
+    // initialize three vecs with capacity nnz
+    let mut rowvec: Vec<usize> = Vec::with_capacity(nnz as usize);
+    let mut colvec: Vec<usize> = Vec::with_capacity(nnz as usize);
+    let mut datavec: Vec<f64> = Vec::with_capacity(nnz as usize);
+
+    //                       shape_id, (dim_of_ip, lengths_along_axis, c)
+    let mut shapes_map: HashMap<i16, (i16, Vec<i32>, Vec<i32>)> = HashMap::with_capacity(num_shapes as usize);
+
+    for _ in 0..(num_shapes as usize) {
+        // Read shapes
+        // shapes_vec[shape_id].0 =
+
+        let l_shape_id = file.read_i16::<LittleEndian>().unwrap();
+
+        let type_of_encoding = file.read_i16::<LittleEndian>().unwrap();
+        if type_of_encoding != 0 {
+            panic!("Only vertex_rec encoding is supported at the moment");
+        }
+
+        // shapes_vec[shape_id].1
+
+        let l_dim_of_ip = file.read_i16::<LittleEndian>().unwrap();
+
+        // for i in 0..dim_of_ip {
+        //     // let min_point = file.read_i32::<LittleEndian>().unwrap();
+        //     // let len_along_axis = file.read_i32::<LittleEndian>().unwrap();
+        //     // let stride = file.read_i32::<LittleEndian>().unwrap();
+        // }
+        // Skip min_point
+        file.seek(SeekFrom::Current((32/8)*(l_dim_of_ip as i64))).unwrap();
+
+        // Read len_along_axis
+        let mut l_len_along_axis: Vec<i32> = Vec::with_capacity(l_dim_of_ip as usize);
+        for _ in 0..l_dim_of_ip {
+            l_len_along_axis.push(file.read_i32::<LittleEndian>().unwrap());
+        }
+
+        // Skip stride
+        file.seek(SeekFrom::Current((32/8)*(l_dim_of_ip as i64))).unwrap();
+
+        // read 2*dim_of_ip c values into shapes_vec[shape_id].2
+        let mut l_c: Vec<i32> = Vec::with_capacity(2*l_dim_of_ip as usize);
+        for _ in 0..2*l_dim_of_ip {
+            l_c.push(file.read_i32::<LittleEndian>().unwrap());
+        }
+
+        shapes_map.insert(l_shape_id,(l_dim_of_ip, l_len_along_axis, l_c));
+    }
+
+    // Read total number of origins
+    let num_origins = file.read_i32::<LittleEndian>().unwrap();
+    // let mut data_offset: i32 = 0;
+
+    //                          shape_id, base_row, base_col
+    let mut origin_shapes: Vec<(i16,i32,i32)> = Vec::with_capacity(num_origins as usize);
+    for _ in 0..num_origins {
+        let shape_id = file.read_i16::<LittleEndian>().unwrap();
+        let base_row = file.read_i32::<LittleEndian>().unwrap();
+        let base_col = file.read_i32::<LittleEndian>().unwrap();
+        // skip reading data_offset
+        file.seek(SeekFrom::Current(32/8)).unwrap();
+
+        // NO NEED TO JUMP TO DATA OFFSET, AS WE READ IT ALL TOGETHER AT THE END. WE JUST POPULATE ROW AND COL VECTORS
+        // Read data offset as the num of elements. We can calculate this, but this is easier
+        // data_offset = file.read_i32::<LittleEndian>().unwrap() - data_offset;
+        // let curr_pos = file.seek(SeekFrom::Current(0)).unwrap();
+        // file.seek(SeekFrom::Start(data_ptr as u64 + data_offset as u64)).unwrap();
+
+        origin_shapes.push((shape_id, base_row, base_col));
+
+        // Return to previous position
+        // file.seek(SeekFrom::Start(curr_pos)).unwrap();
+    }
+
+    // Load ninc coords in memory
+    let mut ninc_rowvec: Vec<usize> = Vec::with_capacity((nnz - inc_nnz) as usize);
+    let mut ninc_colvec: Vec<usize> = Vec::with_capacity((nnz - inc_nnz) as usize);
+
+    // Read uninc_format
+    let uninc_format = file.read_u8().unwrap();
+    match uninc_format {
+        0 => {  //eprintln!("Reading CSR");
+                let mut last_row_cnt = file.read_i32::<LittleEndian>().unwrap();
+
+                // Read rowptr
+                for curr_row in 0..nrows {
+                    let row_cnt = file.read_i32::<LittleEndian>().unwrap();
+                    // Insert row_cnt - last_row_cnt, curr_row values into rowvec
+                    ninc_rowvec.extend(vec![curr_row as usize; (row_cnt - last_row_cnt) as usize]);
+                    last_row_cnt = row_cnt;
+                }
+                // Read colidx
+                for _ in 0..nnz-inc_nnz {
+                    ninc_colvec.push(file.read_i32::<LittleEndian>().unwrap() as usize);
+                }
+             },
+        2 => {  // eprintln!("Reading COO");
+                // Read rowptr
+                for _ in 0..nnz-inc_nnz {
+                    ninc_rowvec.push(file.read_i32::<LittleEndian>().unwrap() as usize);
+                }
+                // Read colptr
+                for _ in 0..nnz-inc_nnz {
+                    ninc_colvec.push(file.read_i32::<LittleEndian>().unwrap() as usize);
+                }
+             },
+        _ => { panic!("The hell you did here man") }
+    }
+
+    // seek to data_ptr
+    file.seek(SeekFrom::Start(data_ptr as u64)).unwrap();
+
+    // Read data
+    for _ in 0..nnz {
+        datavec.push(file.read_f64::<LittleEndian>().unwrap());
+    }
+
+    let now = Instant::now();
+    /*********************************** NOW PROCESS THE DATA IN MEMORY INTO A CSx MATRIX ***********************************/
+    origin_shapes.iter().for_each(|(shape_id, base_row, base_col)| {
+        // traverse row and col from l_row and l_col, and push index into rowvec and colvec
+        let (l_dim_of_ip, l_len_along_axis, l_c) = shapes_map.get(shape_id).unwrap();
+
+        recursive_populate_row_col_vec(*l_dim_of_ip, l_len_along_axis, l_c, &mut rowvec, &mut colvec, *base_row, *base_col);
+    });
+    // Add ninc coords to the end
+    rowvec.extend(ninc_rowvec);
+    colvec.extend(ninc_colvec);
+
+    let coo_mat = TriMat::from_triplets((nrows as usize,ncols as usize), rowvec, colvec, datavec);
+
+    let csx_matrix: CsMat<f64>;
+    if csr {
+        csx_matrix = coo_mat.to_csr();
+    } else {
+        csx_matrix = coo_mat.to_csc();
+    }
+    /************************************************************************************************************************/
+    let elapsed = now.elapsed();
+    println!("{} Converting SPF file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), input_spf_file_path, elapsed.as_secs(), elapsed.subsec_millis());
+    std::io::stdout().flush().unwrap();
 
     // Write matrix to file
     sprs::io::write_matrix_market(output_mtx_file_path, &csx_matrix).unwrap();

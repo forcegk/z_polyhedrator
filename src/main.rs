@@ -27,8 +27,8 @@ mod flags {
     use std::path::PathBuf;
 
     xflags::xflags! {
-        // Search for (meta)patterns in a matrixmarket file. Optionally augment dimensionality and write to SPF file.
         cmd matrix_rs {
+            /// Search for (meta)patterns in a matrixmarket file. Optionally augment dimensionality and write to SPF file.
             cmd search {
                 /// File containing pattern list
                 required patterns_file_path: PathBuf
@@ -70,6 +70,7 @@ mod flags {
                 optional -psmax, --augment-dimensionality-piece-stride-max augment_dimensionality_piece_stride_max: usize
             }
 
+            /// Convert SPF file to MTX file, in either CSC or CSR format
             cmd convert {
                 /// Input SPF file
                 required input_spf_file_path: PathBuf
@@ -80,7 +81,22 @@ mod flags {
                 /// Output in csc format (default)
                 optional --csc
 
-                /// Output in csr format 
+                /// Output in csr format
+                optional --csr
+            }
+
+            /// Convert SPF file to MTX file, in either CSC or CSR format. Modified into a overall slower version for timing purposes (CPU and Disk operations separated in time)
+            cmd convert_timing {
+                /// Input SPF file
+                required input_spf_file_path: PathBuf
+
+                /// Output mtx file
+                required output_mtx_file_path: PathBuf
+
+                /// Output in csc format (default)
+                optional --csc
+
+                /// Output in csr format
                 optional --csr
             }
         }
@@ -229,6 +245,19 @@ fn main() {
                     let elapsed = now.elapsed();
                     println!("{} Converting SPF file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), input_spf_file_path, elapsed.as_secs(), elapsed.subsec_millis());
                     std::io::stdout().flush().unwrap();
+                }
+
+                flags::Matrix_rsCmd::Convert_timing(flags) => {
+                    let input_spf_file_path = flags.input_spf_file_path.to_str().unwrap();
+                    let output_mtx_file_path = flags.output_mtx_file_path.to_str().unwrap();
+
+                    eprintln!("{} Converting SPF file: {}... ", "[INFO]".cyan().bold(), input_spf_file_path);
+                    std::io::stderr().flush().unwrap();
+
+                    spfgen::convert_spf_for_timing(input_spf_file_path, output_mtx_file_path, flags.csr && !flags.csc);
+
+                    // let now = Instant::now();
+                    // let elapsed = now.elapsed();
                 }
             }
         }
