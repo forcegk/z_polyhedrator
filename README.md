@@ -1,4 +1,4 @@
-<img src="doc/img/logo/zpolyhedrator_logo.png" align="right" style="width: 200px; height: 200px;"/>
+<img src="doc/img/logo/zpolyhedrator_logo.png" align="right" style="width: 250px; height: 250px;"/>
 
 # z_polyhedrator
 
