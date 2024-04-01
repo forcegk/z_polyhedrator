@@ -27,7 +27,7 @@ mod flags {
     use std::path::PathBuf;
 
     xflags::xflags! {
-        cmd matrix_rs {
+        cmd z_polyhedrator {
             /// Search for (meta)patterns in a matrixmarket file. Optionally augment dimensionality and write to SPF file.
             cmd search {
                 /// File containing pattern list
@@ -104,10 +104,10 @@ mod flags {
 }
 
 fn main() {
-    match flags::Matrix_rs::from_env() {
+    match flags::Z_polyhedrator::from_env() {
         Ok(matrix_flags) => {
             match matrix_flags.subcommand {
-                flags::Matrix_rsCmd::Search(flags) => {
+                flags::Z_polyhedratorCmd::Search(flags) => {
                     let patterns_file_path = flags.patterns_file_path.to_str().unwrap();
                     let matrixmarket_file_path = flags.matrixmarket_file_path.to_str().unwrap();
 
@@ -232,7 +232,7 @@ fn main() {
                     }
                 }
 
-                flags::Matrix_rsCmd::Convert(flags) => {
+                flags::Z_polyhedratorCmd::Convert(flags) => {
                     let input_spf_file_path = flags.input_spf_file_path.to_str().unwrap();
                     let output_mtx_file_path = flags.output_mtx_file_path.to_str().unwrap();
 
@@ -247,17 +247,15 @@ fn main() {
                     std::io::stdout().flush().unwrap();
                 }
 
-                flags::Matrix_rsCmd::Convert_timing(flags) => {
+                flags::Z_polyhedratorCmd::Convert_timing(flags) => {
                     let input_spf_file_path = flags.input_spf_file_path.to_str().unwrap();
                     let output_mtx_file_path = flags.output_mtx_file_path.to_str().unwrap();
 
                     eprintln!("{} Converting SPF file: {}... ", "[INFO]".cyan().bold(), input_spf_file_path);
                     std::io::stderr().flush().unwrap();
 
+                    // Conversion time is measured inside the function
                     spfgen::convert_spf_for_timing(input_spf_file_path, output_mtx_file_path, flags.csr && !flags.csc);
-
-                    // let now = Instant::now();
-                    // let elapsed = now.elapsed();
                 }
             }
         }

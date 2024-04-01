@@ -20,7 +20,7 @@ if __name__ == "__main__":
     else:
         target = str(sys.argv[2])
 
-    scipy.io.mmwrite(target, mmfile, comment='\n This file was generated with transcode_mm.py tool from matrix_rs.\n')
+    scipy.io.mmwrite(target, mmfile, comment='\n This file was generated with transcode_mm.py tool from z_polyhedrator.\n')
 
     if str(sys.argv[2]) == "stdout":
         print(target.getvalue().decode('utf8'))

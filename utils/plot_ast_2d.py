@@ -25,9 +25,9 @@
 #
 # An AST file is generated using the following syntax:
 #
-# matrix_rs patterns.txt matrix.mtx --print-ast-list > ast_file.txt
+# z_polyhedrator patterns.txt matrix.mtx --print-ast-list > ast_file.txt
 #
-# where `matrix_rs` is the path to the matrix_rs executable, `patterns.txt` is
+# where `z_polyhedrator` is the path to the z_polyhedrator executable, `patterns.txt` is
 # the path to the patterns file, `matrix.mtx` is the path to the matrix file and
 # `ast_file.txt` is the path to the AST file to be generated.
 #

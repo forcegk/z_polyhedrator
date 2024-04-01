@@ -1,10 +1,12 @@
-# matrix_rs
+<img src="doc/img/logo/zpolyhedrator_logo.png" align="right" style="width: 250; height: 250px;"/>
 
-`matrix_rs` is a Rust prototype for detecting regular patterns provided via a pattern file on sparse matrices.
+# z_polyhedrator
+
+`z_polyhedrator` is a program for detecting regular patterns provided via a pattern file on sparse matrices.
 
 ## Installation
 
-You will need the latest version of the [rust toolchain](https://rustup.rs) to compile matrix_rs. Following the [Arch Linux philosophy](https://wiki.archlinux.org/title/Arch_Linux#Modernity), unless said in this README, only the latest version of the rust toolchain is supported. To use the python utils you will also need [python3(.11.2)](https://www.python.org/downloads/) installed and in the $PATH, along with all packages from `utils/requirements.txt` installed.
+You will need the latest version of the [rust toolchain](https://rustup.rs) to compile `z_polyhedrator`. Following the [Arch Linux philosophy](https://wiki.archlinux.org/title/Arch_Linux#Modernity), unless said in this README, only the latest version of the rust toolchain is supported. To use the python utils you will also need [python3(.11.2)](https://www.python.org/downloads/) installed and in the $PATH, along with all packages from `utils/requirements.txt` installed.
 
 Before opening an Issue, check that your rust toolchain is updated (`rustup update`), and both your `python` distribution alongside with its `pip` packages are too.
 
@@ -39,25 +41,24 @@ $env:RUSTFLAGS = "-C opt-level=3 -C target-cpu=native"; cargo build --release
 Debug and release builds are located inside the `target` folder, like below. Needless to say, release builds must be used if good speed is desired, as in this case tend to perform around 20 to 100 times faster.
 ```bash
 # Debug build can be executed with
-./target/debug/matrix_rs <flags>
+./target/debug/z_polyhedrator <flags>
 
 # Release build can be executed with
-./target/release/matrix_rs <flags>
+./target/release/z_polyhedrator <flags>
 ```
 
 ### Command line options
 Help on command line options can be obtained by adding `--help` to the cmdline. A sample (and not necessarilly updated) help output is as below:
 ```
-./target/release/matrix_rs --help
-matrix_rs
-
+./target/release/z_polyhedrator --help
 OPTIONS:
     -h, --help
       Prints help information.
 
 SUBCOMMANDS:
 
-matrix_rs search
+z_polyhedrator search
+  Search for (meta)patterns in a matrixmarket file. Optionally augment dimensionality and write to SPF file.
 
   ARGS:
     <patterns_file_path>
@@ -101,7 +102,8 @@ matrix_rs search
       Max stride for augment dimensionality search
 
 
-matrix_rs convert
+z_polyhedrator convert
+  Convert SPF file to MTX file, in either CSC or CSR format
 
   ARGS:
     <input_spf_file_path>
@@ -117,41 +119,61 @@ matrix_rs convert
     --csr
       Output in csr format
 
+
+z_polyhedrator convert_timing
+  Convert SPF file to MTX file, in either CSC or CSR format. Modified into a overall slower version for timing purposes (CPU and Disk operations separated in time)
+
+  ARGS:
+    <input_spf_file_path>
+      Input SPF file
+
+    <output_mtx_file_path>
+      Output mtx file
+
+  OPTIONS:
+    --csc
+      Output in csc format (default)
+
+    --csr
+      Output in csr format
 ```
 
 ### Example
-If let's say, we wanted to execute `matrix_rs` for `Maragal_1` sparse matrix, the command would be as follows:
+If let's say, we wanted to execute `z_polyhedrator` for `Maragal_1` sparse matrix, the command would be as follows:
 ```bash
 # While on a coding and/or debugging environment
 cargo run -- search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
 
 # Looking for performance
-./target/release/matrix_rs.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
+./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
 ```
 
 However, you will notice that these commands produce no output. Some frequent use cases can be:
 
 #### Printing AST list
 ```bash
-./target/release/matrix_rs.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx --print-ast-list
+./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx --print-ast-list
 ```
 
 #### Writing to SPF file
 ```bash
-./target/release/matrix_rs.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf
+./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf
 ```
 
 #### Mixed usage
 Needless to say, flags can be combined unless explicitly said. For example, in order to obtain more information about the data transformation process, several flags can be specified at the same time.
 ```bash
-./target/release/matrix_rs.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf --print-ast-list --print-uwc-list --print-pattern-list
+./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf --print-ast-list --print-uwc-list --print-pattern-list
 ```
 
 #### Converting SPF to MatrixMarket
 You may want to go the other way around. You can do so with the convert subcommand.
 ```bash
-./target/release/matrix_rs.exe convert ./impcol_2.2d.spf output_impcol_2.mtx
+./target/release/z_polyhedrator.exe convert ./impcol_2.2d.spf output_impcol_2.mtx
 ```
+
+## Main features flowchart
+<p align="center"><a href="https://gac.udc.es" target="_blank"><img src="https://raw.githubusercontent.com/forcegk/matrix_rs/master/doc/img/flowchart/Z-Polyhedrator_Flowchart.svg" width="90%"></a></p>
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first

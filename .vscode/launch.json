@@ -11,11 +11,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=matrix_rs",
-                    "--package=matrix_rs"
+                    "--bin=z_polyhedrator",
+                    "--package=z_polyhedrator"
                 ],
                 "filter": {
-                    "name": "matrix_rs",
+                    "name": "z_polyhedrator",
                     "kind": "bin"
                 }
             },
