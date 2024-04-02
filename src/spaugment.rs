@@ -1,7 +1,7 @@
 use colored::Colorize;
 use itertools::{Itertools, enumerate};
 use linked_hash_map::LinkedHashMap;
-use sprs::CsMat;
+use sprs::{CsMat, TriMat};
 
 use crate::utils::{Pattern,Piece,OriginUwc,MetaPattern,MetaPatternPiece};
 use crate::utils::orig_uwc_to_piece_1d;
@@ -234,10 +234,11 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
     // println!("OCCURRENCES: {:?}", occurrences);
 
     // Compose sparse matrix with origins_list
-    let mut expl_matrix: CsMat<bool> = CsMat::zero((max_row as usize, max_col as usize));
+    let mut expl_matrix = TriMat::with_capacity((max_row as usize, max_col as usize), origins_list.len());
     for (row,col) in origins_list {
-        expl_matrix.insert(*row as usize, *col as usize, false);
+        expl_matrix.add_triplet(*row as usize, *col as usize, 1u8);
     }
+    let mut expl_matrix: CsMat<bool> = expl_matrix.to_csr().map(|_| false);
 
     // DEBUG UNCOMMENT
     // println!("Mat = {:?}", expl_matrix);
