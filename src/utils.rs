@@ -68,7 +68,26 @@ pub fn read_matrix_market_csr<
                     executable_path.bright_blue()
                 );
 
-                let mat = sprs::io::read_matrix_market_from_bufread(&mut bufreader).unwrap();
+                let mat = match sprs::io::read_matrix_market_from_bufread(&mut bufreader){
+                    Ok(mat) => mat,
+                    Err(e) => {
+                        eprintln!(
+                            "{} An error occured while reading the converted MatrixMarket file. ERROR: {}",
+                            "[ERROR]".bold().red(),
+                            format!("{}",e).bold().red()
+                        );
+                        eprintln!(
+                            "\nIf this is not a filesystem related error, try executing {} {} {} {} manually. If it outputs a valid MatrixMarket file, please report the issue on the repository. If it does not, please check your pip dependencies in the {} file and update those packages via pip or your desired package manager.\n",
+                            "python3".bright_blue(),
+                            executable_path.bright_blue(),
+                            path.bright_blue(),
+                            "stdout".bright_blue(),
+                            "requirements.txt".bright_blue()
+                        );
+                        std::process::exit(1);
+                    }
+                };
+
                 if transpose_input {
                     mat.transpose_view().to_csr()
                 } else {
