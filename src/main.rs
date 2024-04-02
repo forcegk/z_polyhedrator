@@ -69,6 +69,9 @@ mod flags {
 
                 /// Max stride for augment dimensionality search
                 optional -psmax, --augment-dimensionality-piece-stride-max augment_dimensionality_piece_stride_max: usize
+
+                /// Write not included single-points as 1-length patterns
+                optional --write-uninc-as-patterns
             }
 
             /// Convert SPF file to MTX file, in either CSC or CSR format
@@ -234,7 +237,7 @@ fn main() {
                             std::io::stderr().flush().unwrap();
                             let now = Instant::now();
 
-                            spfgen.write_spf(&matrixmarket_file_path, &format!("{}.{}d.spf", &output_spf_file_path.1, augment_dimensionality), flags.transpose_input, flags.transpose_output);
+                            spfgen.write_spf(&matrixmarket_file_path, &format!("{}.{}d.spf", &output_spf_file_path.1, augment_dimensionality), flags.transpose_input, flags.transpose_output, flags.write_uninc_as_patterns);
 
                             let elapsed = now.elapsed();
                             println!("{} Writing SPF file took: {}.{:03} seconds", "[TIME]".green().bold(), elapsed.as_secs(), elapsed.subsec_millis());

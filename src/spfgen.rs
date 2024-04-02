@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::{self, File}, io::{Seek, SeekFrom, Write}, path::PathBuf, time::Instant};
+use std::{collections::HashMap, fs::File, io::{Seek, SeekFrom, Write}, path::PathBuf, time::Instant};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use colored::Colorize;
@@ -142,7 +142,7 @@ impl SPFGen {
             .collect::<Vec<(OriginUwc, i32)>>()
     }
 
-    pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str, transpose_input: bool, transpose_output: bool) {
+    pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str, transpose_input: bool, transpose_output: bool, uninc_as_patterns: bool) {
         // Read matrixmarket f64 value matrix
         let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(input_value_matrix, transpose_input);
 
@@ -154,7 +154,7 @@ impl SPFGen {
         let mut file = File::create(output_file_path).expect(format!("Unable to create file {}", output_file_path).as_str());
 
         let path = PathBuf::from(output_file_path);
-        eprintln!("Writing to file {}", fs::canonicalize(&path).unwrap().display());
+        eprintln!("Writing to file {}", path.to_str().unwrap().bright_blue());
 
         // Write header
         file.write_i32::<LittleEndian>(self.nnz as i32).unwrap();
@@ -211,7 +211,7 @@ impl SPFGen {
             .map(|(idx, (_, id))| (*id, idx))
             .collect();
 
-        eprintln!("REORDER: {:?}", reorder);
+        // DEBUG -- eprintln!("REORDER: {:?}", reorder);
 
         self.meta_pattern_pieces
             .iter()
@@ -304,20 +304,20 @@ impl SPFGen {
         let uninc_format: u8 = { if csr_size <= coo_size { 0u8 }
                                  else { 2u8 }};
 
-        eprint!("Writing uninc_format = {} to offset 0x{:X}... ", uninc_format, file.seek(SeekFrom::Current(0)).unwrap());
+        eprintln!("Writing uninc_format = {} to offset 0x{:X}...\n", uninc_format, file.seek(SeekFrom::Current(0)).unwrap());
         file.write_u8(uninc_format).unwrap();
 
         // Set iterator
         let mut mpp_iter = self.meta_pattern_pieces.iter().skip(piece_cutoff);
 
         match uninc_format {
-            0 => {  eprintln!("Writing CSR");
+            0 => {  // DEBUG -- eprintln!("Writing CSR");
                     let mut local_coo_mat: TriMat<u8> = TriMat::new((self.nrows, self.ncols));
-                    eprint!("Writing points: [");
+                    // DEBUG -- eprint!("Writing points: [");
 
                     for _ in piece_cutoff..self.meta_pattern_pieces.len() {
                         let (row, col) = mpp_iter.next().unwrap().0;
-                        eprint!("({},{}) ", *row, *col);
+                        // DEBUG -- eprint!("({},{}) ", *row, *col);
                         local_coo_mat.add_triplet(*row, *col, 1u8);
                     }
 
@@ -328,8 +328,8 @@ impl SPFGen {
                         local_csr_mat = local_coo_mat.transpose_view().to_csr();
                     }
 
-                    eprintln!("\x08] with:\nind_ptr: {:?}", local_csr_mat.proper_indptr());
-                    eprintln!("indices: {:?}", local_csr_mat.indices());
+                    // DEBUG -- eprintln!("\x08] with:\nind_ptr: {:?}", local_csr_mat.proper_indptr());
+                    // DEBUG -- eprintln!("indices: {:?}", local_csr_mat.indices());
 
                     // Write rowptr/indptr
                     local_csr_mat.proper_indptr().iter().for_each(|iptr_val| {
@@ -340,7 +340,7 @@ impl SPFGen {
                         file.write_i32::<LittleEndian>(*ind_val as i32).unwrap();
                     });
                  },
-            2 => {  eprintln!("Writing COO");
+            2 => {  // DEBUG -- eprintln!("Writing COO");
 
                     let mut rowvec: Vec<i32> = vec![];
                     let mut colvec: Vec<i32> = vec![];
@@ -355,17 +355,17 @@ impl SPFGen {
                         std::mem::swap(&mut rowvec, &mut colvec);
                     }
 
-                    eprint!("Writing Rowptr: ");
+                    // DEBUG -- eprint!("Writing Rowptr: ");
                     for row in rowvec {
-                        eprint!("{} ", row);
+                        // DEBUG -- eprint!("{} ", row);
                         file.write_i32::<LittleEndian>(row).unwrap(); // Write rowptr
                     }
-                    eprint!("\nWriting Colptr: ");
+                    // DEBUG -- eprint!("\nWriting Colptr: ");
                     for col in colvec {
-                        eprint!("{} ", col);
+                        // DEBUG -- eprint!("{} ", col);
                         file.write_i32::<LittleEndian>(col).unwrap(); // Write colptr
                     }
-                    eprintln!();
+                    // DEBUG -- eprintln!();
                  },
             _ => { panic!("The hell you did here man") }
         }
