@@ -234,7 +234,7 @@ fn compute_metapatterns(origins_list: &mut Vec<(i32, i32)>, piece_cutoff: usize,
     // println!("OCCURRENCES: {:?}", occurrences);
 
     // Compose sparse matrix with origins_list
-    let mut expl_matrix = TriMat::with_capacity((max_row as usize, max_col as usize), origins_list.len());
+    let mut expl_matrix: TriMat<u8> = TriMat::with_capacity((max_row as usize +1, max_col as usize +1), origins_list.len());
     for (row,col) in origins_list {
         expl_matrix.add_triplet(*row as usize, *col as usize, 1u8);
     }
