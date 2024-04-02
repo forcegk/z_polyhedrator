@@ -1,5 +1,6 @@
 use linked_hash_map::LinkedHashMap;
 use num_traits::{Num, NumCast};
+use project_root::get_project_root;
 use sprs::CsMat;
 use stringreader::StringReader;
 use std::{io::BufReader, process::{Command, Stdio}};
@@ -45,8 +46,13 @@ pub fn read_matrix_market_csr<
                     "sprs".green()
                 );
 
+                let mut project_root = get_project_root().unwrap();
+                project_root.push("utils");
+                project_root.push("transcode_mm.py");
+                let executable_path = project_root.to_str().unwrap();
+
                 let cmd_output = Command::new("python3")
-                    .arg("./utils/transcode_mm.py").arg(path).arg("stdout")
+                    .arg(executable_path).arg(path).arg("stdout")
                     .stdout(Stdio::piped())
                     .output()
                     .expect("Failed to execute python3 script");
@@ -58,8 +64,8 @@ pub fn read_matrix_market_csr<
 
                 eprintln!(
                     "{} MatrixMarket file was converted succesfully. If the files will be accessed often, seriously consider transcoding it with the tool located on {} for efficient CPU usage and faster runtime.\n",
-                    "[INFO]".bold().blue(),
-                    "./utils/transcode_mm.py".bright_blue()
+                    "[PY-INFO]".bold().blue(),
+                    executable_path.bright_blue()
                 );
 
                 let mat = sprs::io::read_matrix_market_from_bufread(&mut bufreader).unwrap();

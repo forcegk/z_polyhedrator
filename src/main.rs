@@ -5,6 +5,7 @@ use std::io::Write;
 use std::process::exit;
 use std::time::Instant;
 use colored::Colorize;
+use project_root::get_project_root;
 
 mod spsearch;
 #[allow(unused_imports)]
@@ -104,6 +105,17 @@ mod flags {
 }
 
 fn main() {
+    let project_root = get_project_root();
+    match project_root {
+        Ok(path) => {
+            eprintln!("{} Project root is: {:?}", "[INFO]".cyan().bold(), path);
+        }
+        Err(e) => {
+            eprintln!("{} {:?}. Exiting...", "[ERROR]".red().bold(), e);
+            exit(-1);
+        }
+    }
+
     match flags::Z_polyhedrator::from_env() {
         Ok(matrix_flags) => {
             match matrix_flags.subcommand {
