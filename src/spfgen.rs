@@ -158,7 +158,7 @@ impl SPFGen {
 
         // Write header
         file.write_i32::<LittleEndian>(self.nnz as i32).unwrap();
-        file.write_i32::<LittleEndian>(self.inc_nnz as i32).unwrap();
+        file.write_i32::<LittleEndian>( if uninc_as_patterns { self.nnz as i32 } else { self.inc_nnz as i32 } ).unwrap();
         if !transpose_output {
             // Write matrix in a normal way
             file.write_i32::<LittleEndian>(self.nrows as i32).unwrap();
@@ -169,23 +169,25 @@ impl SPFGen {
             file.write_i32::<LittleEndian>(self.nrows as i32).unwrap();
         }
 
+        // Get index of single nonzeros (not in a pattern to filter them out of the next foreach)
+        // let ninc_nonzero_pattern_id = self.distinct_patterns.get(&(1,0,0)).unwrap();
+        // If we want to dump everything as patterns, we can just filter the single nonzeros with a never-used id, like min i32
+        let ninc_nonzero_pattern_id = if uninc_as_patterns { std::i32::MIN } else { -1i32 };
+
+        // This has been brought from down below, as it is useful for the following computation
+        // We also know that regular pieces are at the end of the list
+        let piece_cutoff = self.meta_pattern_pieces.iter().filter(|(_, id)| **id != ninc_nonzero_pattern_id).count();
+        // println!("Piece cutoff = {}", piece_cutoff);
+
         // Write dimensions
         file.write_i16::<LittleEndian>(2i16).unwrap();
         // number of base shapes is actual found shapes, not unfound ones. Also we have to take into account removing the single nonzeros
-        file.write_i32::<LittleEndian>((self.meta_pattern_pieces.iter().filter(|(_, id)| **id != -1).unique_by(|(_, id)| **id).count()) as i32).unwrap();
+        file.write_i32::<LittleEndian>((self.meta_pattern_pieces.iter().filter(|(_, id)| **id != ninc_nonzero_pattern_id).unique_by(|(_, id)| **id).count()) as i32).unwrap();
         // write zero hierarchical shapes
         file.write_i32::<LittleEndian>(0i32).unwrap();
         // write TEMPORARY ZERO as pointer to start of data. Will need to fseek to position 26 later
         //  (python code `f.seek ( 26 )` on write_spf func at around line 810)
         file.write_i32::<LittleEndian>(0i32).unwrap();
-
-        // Get index of single nonzeros (not in a pattern to filter them out of the next foreach)
-        // let ninc_nonzero_pattern_id = self.distinct_patterns.get(&(1,0,0)).unwrap();
-        let ninc_nonzero_pattern_id = -1i32;
-        // This has been brought from down below, as it is useful for the following computation
-        // We also know that regular pieces are at the end of the list
-        let piece_cutoff = self.meta_pattern_pieces.iter().filter(|(_, id)| **id != ninc_nonzero_pattern_id).count();
-        // println!("Piece cutoff = {}", piece_cutoff);
 
         let shape_dims_max: i16 = {
             if piece_cutoff == 0 { 0i16 }
@@ -205,7 +207,7 @@ impl SPFGen {
         // Create REORDER dictionary
         let reorder: LinkedHashMap<i32, usize> = self.meta_pattern_pieces
             .iter()
-            .filter(|(_, id)| **id != -1)
+            .filter(|(_, id)| **id != ninc_nonzero_pattern_id)
             .unique_by(|(_, id)| **id)
             .enumerate()
             .map(|(idx, (_, id))| (*id, idx))
@@ -215,7 +217,7 @@ impl SPFGen {
 
         self.meta_pattern_pieces
             .iter()
-            .filter(|(_, id)| **id != -1)
+            .filter(|(_, id)| **id != ninc_nonzero_pattern_id)
             .unique_by(|(_, id)| **id)
             .for_each(|(_, id)| {
 
@@ -243,7 +245,7 @@ impl SPFGen {
             for i in 0..ch[0].len() {
                 // taking shortcut as minimal points are always [0,0,...,0] (N times)
                 file.write_i32::<LittleEndian>(ch[ch.len()-1][i]).unwrap();
-                // println!("    - Lenghts along axes from ch[ch.len()-1][i] {:?}", ch[ch.len()-1][i]);
+                // println!("    - Lenghts along axis from ch[ch.len()-1][i] {:?}", ch[ch.len()-1][i]);
             }
 
             // "Hardcoded stride at this time"
@@ -301,8 +303,12 @@ impl SPFGen {
         let csr_size = self.nrows + 1 + (self.nnz - self.inc_nnz);
         let coo_size = 2 * (self.nnz - self.inc_nnz);
 
-        let uninc_format: u8 = { if csr_size <= coo_size { 0u8 }
-                                 else { 2u8 }};
+        // If we are dumping uninc as patterns, we have to use COO format for zero space wasted
+        let uninc_format: u8 = if uninc_as_patterns { 2u8 }
+                               else {
+                                   if csr_size <= coo_size { 0u8 }
+                                   else { 2u8 }
+                               };
 
         eprintln!("Writing uninc_format = {} to offset 0x{:X}...\n", uninc_format, file.seek(SeekFrom::Current(0)).unwrap());
         file.write_u8(uninc_format).unwrap();
