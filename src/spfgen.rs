@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::{self, File}, io::{Seek, SeekFrom, Write}, path::PathBuf, time::Instant};
+use std::{collections::HashMap, fs::File, io::{Seek, SeekFrom, Write}, path::PathBuf, time::Instant};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use colored::Colorize;
@@ -142,7 +142,7 @@ impl SPFGen {
             .collect::<Vec<(OriginUwc, i32)>>()
     }
 
-    pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str, transpose_input: bool, transpose_output: bool) {
+    pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str, transpose_input: bool, transpose_output: bool, uninc_as_patterns: bool) {
         // Read matrixmarket f64 value matrix
         let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(input_value_matrix, transpose_input);
 
@@ -154,11 +154,11 @@ impl SPFGen {
         let mut file = File::create(output_file_path).expect(format!("Unable to create file {}", output_file_path).as_str());
 
         let path = PathBuf::from(output_file_path);
-        eprintln!("Writing to file {}", fs::canonicalize(&path).unwrap().display());
+        eprintln!("Writing to file {}", path.to_str().unwrap().bright_blue());
 
         // Write header
         file.write_i32::<LittleEndian>(self.nnz as i32).unwrap();
-        file.write_i32::<LittleEndian>(self.inc_nnz as i32).unwrap();
+        file.write_i32::<LittleEndian>( if uninc_as_patterns { self.nnz as i32 } else { self.inc_nnz as i32 } ).unwrap();
         if !transpose_output {
             // Write matrix in a normal way
             file.write_i32::<LittleEndian>(self.nrows as i32).unwrap();
@@ -169,23 +169,25 @@ impl SPFGen {
             file.write_i32::<LittleEndian>(self.nrows as i32).unwrap();
         }
 
+        // Get index of single nonzeros (not in a pattern to filter them out of the next foreach)
+        // let ninc_nonzero_pattern_id = self.distinct_patterns.get(&(1,0,0)).unwrap();
+        // If we want to dump everything as patterns, we can just filter the single nonzeros with a never-used id, like min i32
+        let ninc_nonzero_pattern_id = if uninc_as_patterns { std::i32::MIN } else { -1i32 };
+
+        // This has been brought from down below, as it is useful for the following computation
+        // We also know that regular pieces are at the end of the list
+        let piece_cutoff = self.meta_pattern_pieces.iter().filter(|(_, id)| **id != ninc_nonzero_pattern_id).count();
+        // println!("Piece cutoff = {}", piece_cutoff);
+
         // Write dimensions
         file.write_i16::<LittleEndian>(2i16).unwrap();
         // number of base shapes is actual found shapes, not unfound ones. Also we have to take into account removing the single nonzeros
-        file.write_i32::<LittleEndian>((self.meta_pattern_pieces.iter().filter(|(_, id)| **id != -1).unique_by(|(_, id)| **id).count()) as i32).unwrap();
+        file.write_i32::<LittleEndian>((self.meta_pattern_pieces.iter().filter(|(_, id)| **id != ninc_nonzero_pattern_id).unique_by(|(_, id)| **id).count()) as i32).unwrap();
         // write zero hierarchical shapes
         file.write_i32::<LittleEndian>(0i32).unwrap();
         // write TEMPORARY ZERO as pointer to start of data. Will need to fseek to position 26 later
         //  (python code `f.seek ( 26 )` on write_spf func at around line 810)
         file.write_i32::<LittleEndian>(0i32).unwrap();
-
-        // Get index of single nonzeros (not in a pattern to filter them out of the next foreach)
-        // let ninc_nonzero_pattern_id = self.distinct_patterns.get(&(1,0,0)).unwrap();
-        let ninc_nonzero_pattern_id = -1i32;
-        // This has been brought from down below, as it is useful for the following computation
-        // We also know that regular pieces are at the end of the list
-        let piece_cutoff = self.meta_pattern_pieces.iter().filter(|(_, id)| **id != ninc_nonzero_pattern_id).count();
-        // println!("Piece cutoff = {}", piece_cutoff);
 
         let shape_dims_max: i16 = {
             if piece_cutoff == 0 { 0i16 }
@@ -205,17 +207,17 @@ impl SPFGen {
         // Create REORDER dictionary
         let reorder: LinkedHashMap<i32, usize> = self.meta_pattern_pieces
             .iter()
-            .filter(|(_, id)| **id != -1)
+            .filter(|(_, id)| **id != ninc_nonzero_pattern_id)
             .unique_by(|(_, id)| **id)
             .enumerate()
             .map(|(idx, (_, id))| (*id, idx))
             .collect();
 
-        eprintln!("REORDER: {:?}", reorder);
+        // DEBUG -- eprintln!("REORDER: {:?}", reorder);
 
         self.meta_pattern_pieces
             .iter()
-            .filter(|(_, id)| **id != -1)
+            .filter(|(_, id)| **id != ninc_nonzero_pattern_id)
             .unique_by(|(_, id)| **id)
             .for_each(|(_, id)| {
 
@@ -243,7 +245,7 @@ impl SPFGen {
             for i in 0..ch[0].len() {
                 // taking shortcut as minimal points are always [0,0,...,0] (N times)
                 file.write_i32::<LittleEndian>(ch[ch.len()-1][i]).unwrap();
-                // println!("    - Lenghts along axes from ch[ch.len()-1][i] {:?}", ch[ch.len()-1][i]);
+                // println!("    - Lenghts along axis from ch[ch.len()-1][i] {:?}", ch[ch.len()-1][i]);
             }
 
             // "Hardcoded stride at this time"
@@ -301,23 +303,27 @@ impl SPFGen {
         let csr_size = self.nrows + 1 + (self.nnz - self.inc_nnz);
         let coo_size = 2 * (self.nnz - self.inc_nnz);
 
-        let uninc_format: u8 = { if csr_size <= coo_size { 0u8 }
-                                 else { 2u8 }};
+        // If we are dumping uninc as patterns, we have to use COO format for zero space wasted
+        let uninc_format: u8 = if uninc_as_patterns { 2u8 }
+                               else {
+                                   if csr_size <= coo_size { 0u8 }
+                                   else { 2u8 }
+                               };
 
-        eprint!("Writing uninc_format = {} to offset 0x{:X}... ", uninc_format, file.seek(SeekFrom::Current(0)).unwrap());
+        eprintln!("Writing uninc_format = {} to offset 0x{:X}...\n", uninc_format, file.seek(SeekFrom::Current(0)).unwrap());
         file.write_u8(uninc_format).unwrap();
 
         // Set iterator
         let mut mpp_iter = self.meta_pattern_pieces.iter().skip(piece_cutoff);
 
         match uninc_format {
-            0 => {  eprintln!("Writing CSR");
+            0 => {  // DEBUG -- eprintln!("Writing CSR");
                     let mut local_coo_mat: TriMat<u8> = TriMat::new((self.nrows, self.ncols));
-                    eprint!("Writing points: [");
+                    // DEBUG -- eprint!("Writing points: [");
 
                     for _ in piece_cutoff..self.meta_pattern_pieces.len() {
                         let (row, col) = mpp_iter.next().unwrap().0;
-                        eprint!("({},{}) ", *row, *col);
+                        // DEBUG -- eprint!("({},{}) ", *row, *col);
                         local_coo_mat.add_triplet(*row, *col, 1u8);
                     }
 
@@ -328,8 +334,8 @@ impl SPFGen {
                         local_csr_mat = local_coo_mat.transpose_view().to_csr();
                     }
 
-                    eprintln!("\x08] with:\nind_ptr: {:?}", local_csr_mat.proper_indptr());
-                    eprintln!("indices: {:?}", local_csr_mat.indices());
+                    // DEBUG -- eprintln!("\x08] with:\nind_ptr: {:?}", local_csr_mat.proper_indptr());
+                    // DEBUG -- eprintln!("indices: {:?}", local_csr_mat.indices());
 
                     // Write rowptr/indptr
                     local_csr_mat.proper_indptr().iter().for_each(|iptr_val| {
@@ -340,7 +346,7 @@ impl SPFGen {
                         file.write_i32::<LittleEndian>(*ind_val as i32).unwrap();
                     });
                  },
-            2 => {  eprintln!("Writing COO");
+            2 => {  // DEBUG -- eprintln!("Writing COO");
 
                     let mut rowvec: Vec<i32> = vec![];
                     let mut colvec: Vec<i32> = vec![];
@@ -355,17 +361,17 @@ impl SPFGen {
                         std::mem::swap(&mut rowvec, &mut colvec);
                     }
 
-                    eprint!("Writing Rowptr: ");
+                    // DEBUG -- eprint!("Writing Rowptr: ");
                     for row in rowvec {
-                        eprint!("{} ", row);
+                        // DEBUG -- eprint!("{} ", row);
                         file.write_i32::<LittleEndian>(row).unwrap(); // Write rowptr
                     }
-                    eprint!("\nWriting Colptr: ");
+                    // DEBUG -- eprint!("\nWriting Colptr: ");
                     for col in colvec {
-                        eprint!("{} ", col);
+                        // DEBUG -- eprint!("{} ", col);
                         file.write_i32::<LittleEndian>(col).unwrap(); // Write colptr
                     }
-                    eprintln!();
+                    // DEBUG -- eprintln!();
                  },
             _ => { panic!("The hell you did here man") }
         }

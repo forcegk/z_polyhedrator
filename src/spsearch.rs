@@ -71,6 +71,8 @@ impl SpSearchMatrix {
     
                 (i, j, k)
             })
+            // Discard single-point patterns
+            .filter(|(i,_,_)| *i > 1)
             .collect();
     }
 
