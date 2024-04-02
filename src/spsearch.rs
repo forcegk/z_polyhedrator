@@ -1,3 +1,4 @@
+use colored::Colorize;
 use text_io::scan;
 use std::io::BufRead;
 use sprs::CsMat;
@@ -68,6 +69,10 @@ impl SpSearchMatrix {
             .map(|x| {
                 let (i,j,k): Pattern;
                 scan!(x.bytes() => "({},{},{})", i, j, k);
+
+                if i < 2 {
+                    panic!("Detected pattern ({},{},{})! Pattern lengths must be greater than 1.\n{}", i,j,k, if i == 1 { format!("Perhaps you want to use the {} flag {}\n", "experimental".red().bold(), "--write-uninc-as-patterns".yellow().bold()) } else { "".to_string() });
+                };
     
                 (i, j, k)
             })
