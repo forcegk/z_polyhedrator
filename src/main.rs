@@ -72,6 +72,9 @@ mod flags {
 
                 /// Write not included single-points as 1-length patterns
                 optional --write-uninc-as-patterns
+
+                /// Enable experimental features
+                optional --experimental
             }
 
             /// Convert SPF file to MTX file, in either CSC or CSR format
@@ -125,6 +128,20 @@ fn main() {
                 flags::Z_polyhedratorCmd::Search(flags) => {
                     let patterns_file_path = flags.patterns_file_path.to_str().unwrap();
                     let matrixmarket_file_path = flags.matrixmarket_file_path.to_str().unwrap();
+
+                    /****** EXPERIMENTAL FLAGS SUMMARY ******/
+                    if flags.experimental {
+                        eprintln!("{} Experimental features enabled. Use with caution.", "[WARNING]".yellow().bold());
+                        if flags.write_uninc_as_patterns {
+                            eprintln!("{} Experimental feature {} enabled. Use with caution.", "[WARNING]".yellow().bold(), "--write-uninc-as-patterns".yellow().bold());
+                        }
+                    } else {
+                        if flags.write_uninc_as_patterns {
+                            eprintln!("{} Enable experimental features with {} flag.", "[ERROR]".red().bold(), "--experimental".yellow().bold());
+                            exit(-1);
+                        }
+                    }
+                    /****************************************/
 
                     let output_spf_file_path: (bool, String);
                     output_spf_file_path = {

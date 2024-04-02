@@ -54,6 +54,8 @@ Debug and release builds are located inside the `target` folder, like below. Nee
 Help on command line options can be obtained by adding `--help` to the cmdline. A sample (and not necessarilly updated) help output is as below:
 ```
 ./target/release/z_polyhedrator --help
+z_polyhedrator
+
 OPTIONS:
     -h, --help
       Prints help information.
@@ -103,6 +105,12 @@ z_polyhedrator search
 
     -psmax, --augment-dimensionality-piece-stride-max <augment_dimensionality_piece_stride_max>
       Max stride for augment dimensionality search
+
+    --write-uninc-as-patterns
+      Write not included single-points as 1-length patterns
+
+    --experimental
+      Enable experimental features
 
 
 z_polyhedrator convert
