@@ -31,7 +31,7 @@ impl SpAugment {
             })
             .collect::<LinkedHashMap<MetaPatternPiece, i32>>();
 
-        // NOTE HERE! The key -1 does not have to be in this list! It is only included on the distinct patterns list from spfgen temporarily, but it is NOT necessary.
+        // NOTE HERE! The key -1 does not have to be in this list! It is only included on the distinct patterns list from uzpgen temporarily, but it is NOT necessary.
         let mut meta_patterns: LinkedHashMap<i32, MetaPattern> = LinkedHashMap::new();
         for ((_,_,(n,i,j)), id) in origin_uwc_list.iter().map(|(ouwc, id)| (orig_uwc_to_piece_1d(ouwc), id)) {
             if meta_patterns.get(id).is_some() { continue; }

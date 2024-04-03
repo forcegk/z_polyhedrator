@@ -15,9 +15,9 @@ mod spaugment;
 #[allow(unused_imports)]
 use crate::spaugment::SpAugment;
 
-mod spfgen;
+mod uzpgen;
 #[allow(unused_imports)]
-use crate::spfgen::SPFGen;
+use crate::uzpgen::UZPGen;
 
 #[macro_use(c)]
 extern crate cute;
@@ -29,7 +29,7 @@ mod flags {
 
     xflags::xflags! {
         cmd z_polyhedrator {
-            /// Search for (meta)patterns in a matrixmarket file. Optionally augment dimensionality and write to SPF file.
+            /// Search for (meta)patterns in a matrixmarket file. Optionally augment dimensionality and write to UZP file.
             cmd search {
                 /// File containing pattern list
                 required patterns_file_path: PathBuf
@@ -55,8 +55,8 @@ mod flags {
                 /// [2D SEARCH] Search Flags. Valid options: {[PatternFirst], CellFirst} where [] = default.
                 optional --search-flags search_flags: String
 
-                /// Write to custom SPF file. By default writes to matrix_market_file.mtx.spf
-                optional -w,--write-spf output_spf_file_path: PathBuf
+                /// Write to custom UZP file. Writes to <output_uzp_file_path>.<N>d.uzp
+                optional -w,--write-uzp output_uzp_file_path: PathBuf
 
                 /// Augment dimensionality
                 optional -a, --augment-dimensionality augment_dimensionality: usize
@@ -77,10 +77,10 @@ mod flags {
                 optional --experimental
             }
 
-            /// Convert SPF file to MTX file, in either CSC or CSR format
+            /// Convert UZP file to MTX file, in either CSC or CSR format
             cmd convert {
-                /// Input SPF file
-                required input_spf_file_path: PathBuf
+                /// Input UZP file
+                required input_uzp_file_path: PathBuf
 
                 /// Output mtx file
                 required output_mtx_file_path: PathBuf
@@ -92,10 +92,10 @@ mod flags {
                 optional --csr
             }
 
-            /// Convert SPF file to MTX file, in either CSC or CSR format. Modified into a overall slower version for timing purposes (CPU and Disk operations separated in time)
+            /// Convert UZP file to MTX file, in either CSC or CSR format. Modified into a overall slower version for timing purposes (CPU and Disk operations separated in time)
             cmd convert_timing {
-                /// Input SPF file
-                required input_spf_file_path: PathBuf
+                /// Input UZP file
+                required input_uzp_file_path: PathBuf
 
                 /// Output mtx file
                 required output_mtx_file_path: PathBuf
@@ -143,10 +143,10 @@ fn main() {
                     }
                     /****************************************/
 
-                    let output_spf_file_path: (bool, String);
-                    output_spf_file_path = {
-                        if flags.write_spf.as_ref().is_some() {
-                            (true, String::from(flags.write_spf.unwrap().to_str().unwrap()))
+                    let output_uzp_file_path: (bool, String);
+                    output_uzp_file_path = {
+                        if flags.write_uzp.as_ref().is_some() {
+                            (true, String::from(flags.write_uzp.unwrap().to_str().unwrap()))
                         } else {
                             (false, String::new())
                         }
@@ -216,19 +216,19 @@ fn main() {
                         base_matrix.print_pieces();
                     }
 
-                    /* -------- AUGMENT DIMENSIONALITY AND WRITE SPF FILE IF REQUIRED -------- */
+                    /* -------- AUGMENT DIMENSIONALITY AND WRITE UZP FILE IF REQUIRED -------- */
                     let augment_dimensionality: usize = flags.augment_dimensionality.unwrap_or(1);
                     let augment_dimensionality_piece_cutoff: usize = flags.augment_dimensionality_piece_cutoff.unwrap_or(2);
                     let augment_dimensionality_piece_stride_max: usize = flags.augment_dimensionality_piece_stride_max.unwrap_or(std::usize::MAX);
                     let augment_dimensionality_piece_stride_min: usize = flags.augment_dimensionality_piece_stride_min.unwrap_or(0);
 
-                    if flags.print_uwc_list || output_spf_file_path.0 || augment_dimensionality > 1 {
-                        let mut spfgen = SPFGen::from_piece_list(base_matrix.get_piece_list(), base_matrix.numrows, base_matrix.numcols, base_matrix.nonzeros);
+                    if flags.print_uwc_list || output_uzp_file_path.0 || augment_dimensionality > 1 {
+                        let mut uzpgen = UZPGen::from_piece_list(base_matrix.get_piece_list(), base_matrix.numrows, base_matrix.numcols, base_matrix.nonzeros);
 
                         let mut spaugment;
                         if augment_dimensionality > 1 {
                             // Augment dimensionality
-                            spaugment = SpAugment::from_1d_origin_uwc_list(spfgen.get_orig_uwc_list(), spfgen.nrows, spfgen.ncols, spfgen.nnz);
+                            spaugment = SpAugment::from_1d_origin_uwc_list(uzpgen.get_orig_uwc_list(), uzpgen.nrows, uzpgen.ncols, uzpgen.nnz);
 
                             eprintln!("{} Augmenting dimensionality... ", "[INFO]".cyan().bold());
                             std::io::stderr().flush().unwrap();
@@ -240,24 +240,24 @@ fn main() {
                             println!("{} Augmenting dimensionality took: {}.{:03} seconds", "[TIME]".green().bold(), elapsed.as_secs(), elapsed.subsec_millis());
                             std::io::stdout().flush().unwrap();
 
-                            // And update spfgen accordingly
-                            spfgen = SPFGen::from_metapatterns_list(spaugment.get_metapatterns(), spaugment.get_metapattern_pieces(), spfgen.nrows, spfgen.ncols, spfgen.nnz, spfgen.inc_nnz);
+                            // And update uzpgen accordingly
+                            uzpgen = UZPGen::from_metapatterns_list(spaugment.get_metapatterns(), spaugment.get_metapattern_pieces(), uzpgen.nrows, uzpgen.ncols, uzpgen.nnz, uzpgen.inc_nnz);
                         }
 
                         if flags.print_uwc_list {
-                            spfgen.print_uwc_list(true);
-                            spfgen.print_distinct_uwc_list(true);
+                            uzpgen.print_uwc_list(true);
+                            uzpgen.print_distinct_uwc_list(true);
                         }
 
-                        if output_spf_file_path.0 {
-                            eprintln!("{} Writing SPF file... ", "[INFO]".cyan().bold());
+                        if output_uzp_file_path.0 {
+                            eprintln!("{} Writing UZP file... ", "[INFO]".cyan().bold());
                             std::io::stderr().flush().unwrap();
                             let now = Instant::now();
 
-                            spfgen.write_spf(&matrixmarket_file_path, &format!("{}.{}d.spf", &output_spf_file_path.1, augment_dimensionality), flags.transpose_input, flags.transpose_output, flags.write_uninc_as_patterns);
+                            uzpgen.write_uzp(&matrixmarket_file_path, &format!("{}.{}d.uzp", &output_uzp_file_path.1, augment_dimensionality), flags.transpose_input, flags.transpose_output, flags.write_uninc_as_patterns);
 
                             let elapsed = now.elapsed();
-                            println!("{} Writing SPF file took: {}.{:03} seconds", "[TIME]".green().bold(), elapsed.as_secs(), elapsed.subsec_millis());
+                            println!("{} Writing UZP file took: {}.{:03} seconds", "[TIME]".green().bold(), elapsed.as_secs(), elapsed.subsec_millis());
                             std::io::stdout().flush().unwrap();
                         }
 
@@ -265,29 +265,29 @@ fn main() {
                 }
 
                 flags::Z_polyhedratorCmd::Convert(flags) => {
-                    let input_spf_file_path = flags.input_spf_file_path.to_str().unwrap();
+                    let input_uzp_file_path = flags.input_uzp_file_path.to_str().unwrap();
                     let output_mtx_file_path = flags.output_mtx_file_path.to_str().unwrap();
 
-                    eprintln!("{} Converting SPF file: {}... ", "[INFO]".cyan().bold(), input_spf_file_path);
+                    eprintln!("{} Converting UZP file: {}... ", "[INFO]".cyan().bold(), input_uzp_file_path);
                     std::io::stderr().flush().unwrap();
                     let now = Instant::now();
 
-                    spfgen::convert_spf(input_spf_file_path, output_mtx_file_path, flags.csr && !flags.csc);
+                    uzpgen::convert_uzp(input_uzp_file_path, output_mtx_file_path, flags.csr && !flags.csc);
 
                     let elapsed = now.elapsed();
-                    println!("{} Converting SPF file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), input_spf_file_path, elapsed.as_secs(), elapsed.subsec_millis());
+                    println!("{} Converting UZP file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), input_uzp_file_path, elapsed.as_secs(), elapsed.subsec_millis());
                     std::io::stdout().flush().unwrap();
                 }
 
                 flags::Z_polyhedratorCmd::Convert_timing(flags) => {
-                    let input_spf_file_path = flags.input_spf_file_path.to_str().unwrap();
+                    let input_uzp_file_path = flags.input_uzp_file_path.to_str().unwrap();
                     let output_mtx_file_path = flags.output_mtx_file_path.to_str().unwrap();
 
-                    eprintln!("{} Converting SPF file: {}... ", "[INFO]".cyan().bold(), input_spf_file_path);
+                    eprintln!("{} Converting UZP file: {}... ", "[INFO]".cyan().bold(), input_uzp_file_path);
                     std::io::stderr().flush().unwrap();
 
                     // Conversion time is measured inside the function
-                    spfgen::convert_spf_for_timing(input_spf_file_path, output_mtx_file_path, flags.csr && !flags.csc);
+                    uzpgen::convert_uzp_for_timing(input_uzp_file_path, output_mtx_file_path, flags.csr && !flags.csc);
                 }
             }
         }

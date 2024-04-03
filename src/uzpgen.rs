@@ -9,7 +9,7 @@ use sprs::{CsMat, TriMat};
 
 use crate::utils::{Pattern,Piece,Uwc,OriginUwc, MetaPattern, MetaPatternPiece, convex_hull_hyperrectangle_nd, metapattern_to_hyperrectangle_uwc};
 
-pub struct SPFGen {
+pub struct UZPGen {
     pub nrows: usize,
     pub ncols: usize,
     pub nnz: usize,
@@ -24,7 +24,7 @@ pub struct SPFGen {
     meta_pattern_pieces: LinkedHashMap<MetaPatternPiece, i32>
 }
 
-impl SPFGen {
+impl UZPGen {
     pub fn from_piece_list(ast_list: Vec<Piece>, nrows: usize, ncols: usize, nnz: usize) -> Self {
         let ninc_nnz = ast_list.iter().filter(|(_,_,(n,_,_))| *n == 1).count();
         let inc_nnz = nnz - ninc_nnz;
@@ -59,7 +59,7 @@ impl SPFGen {
                 .collect();
         }
 
-        return SPFGen {
+        return UZPGen {
             nrows,
             ncols,
             nnz,
@@ -80,7 +80,7 @@ impl SPFGen {
         // let mut mp = meta_patterns;
         // mp.get_refresh(&-1);
 
-        return SPFGen {
+        return UZPGen {
             nrows,
             ncols,
             nnz,
@@ -142,7 +142,7 @@ impl SPFGen {
             .collect::<Vec<(OriginUwc, i32)>>()
     }
 
-    pub fn write_spf(&self, input_value_matrix: &str, output_file_path: &str, transpose_input: bool, transpose_output: bool, uninc_as_patterns: bool) {
+    pub fn write_uzp(&self, input_value_matrix: &str, output_file_path: &str, transpose_input: bool, transpose_output: bool, uninc_as_patterns: bool) {
         // Read matrixmarket f64 value matrix
         let f64_value_matrix: CsMat<f64> = crate::utils::read_matrix_market_csr(input_value_matrix, transpose_input);
 
@@ -186,7 +186,7 @@ impl SPFGen {
         // write zero hierarchical shapes
         file.write_i32::<LittleEndian>(0i32).unwrap();
         // write TEMPORARY ZERO as pointer to start of data. Will need to fseek to position 26 later
-        //  (python code `f.seek ( 26 )` on write_spf func at around line 810)
+        //  (python code `f.seek ( 26 )` on write_uzp func at around line 810)
         file.write_i32::<LittleEndian>(0i32).unwrap();
 
         let shape_dims_max: i16 = {
@@ -394,8 +394,8 @@ impl SPFGen {
     }
 }
 
-pub fn convert_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: bool) {
-    let mut file = File::open(input_spf_file_path).expect(format!("Unable to open spf file {}", input_spf_file_path).as_str());
+pub fn convert_uzp (input_uzp_file_path: &str, output_mtx_file_path: &str, csr: bool) {
+    let mut file = File::open(input_uzp_file_path).expect(format!("Unable to open uzp file {}", input_uzp_file_path).as_str());
 
     // Read header
     let nnz = file.read_i32::<LittleEndian>().unwrap();
@@ -554,8 +554,8 @@ pub fn convert_spf (input_spf_file_path: &str, output_mtx_file_path: &str, csr: 
     sprs::io::write_matrix_market(output_mtx_file_path, &csx_matrix).unwrap();
 }
 
-pub fn convert_spf_for_timing (input_spf_file_path: &str, output_mtx_file_path: &str, csr: bool) {
-    let mut file = File::open(input_spf_file_path).expect(format!("Unable to open spf file {}", input_spf_file_path).as_str());
+pub fn convert_uzp_for_timing (input_uzp_file_path: &str, output_mtx_file_path: &str, csr: bool) {
+    let mut file = File::open(input_uzp_file_path).expect(format!("Unable to open uzp file {}", input_uzp_file_path).as_str());
 
     // Read header
     let nnz = file.read_i32::<LittleEndian>().unwrap();
@@ -721,7 +721,7 @@ pub fn convert_spf_for_timing (input_spf_file_path: &str, output_mtx_file_path: 
     }
     /************************************************************************************************************************/
     let elapsed = now.elapsed();
-    println!("{} Converting SPF file: {} took: {}.{:09} seconds", "[TIME]".green().bold(), input_spf_file_path, elapsed.as_secs(), elapsed.subsec_nanos());
+    println!("{} Converting UZP file: {} took: {}.{:09} seconds", "[TIME]".green().bold(), input_uzp_file_path, elapsed.as_secs(), elapsed.subsec_nanos());
     std::io::stdout().flush().unwrap();
 
     // Write matrix to file

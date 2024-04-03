@@ -4,7 +4,7 @@
 
 `z_polyhedrator` is a program for detecting regular patterns provided via a pattern file on sparse matrices.
 
-It works with the Sparse Polyhedral Format (temporary name) and it does it quite fast. It can currently search n-D patterns in sparse matrices, export SPF files, and convert SPF files to MTX back again.
+It works with the UZP (Union of Z-Polyhedra) and it does it quite fast. It can currently search n-D patterns in sparse matrices, export UZP files, and convert UZP files to MTX back again.
 Soon, it will support reading from Rutherford Boeing files, and much faster on the fly mtx conversion, whenever the Python dependency is removed.
 
 ## Installation
@@ -63,7 +63,7 @@ OPTIONS:
 SUBCOMMANDS:
 
 z_polyhedrator search
-  Search for (meta)patterns in a matrixmarket file. Optionally augment dimensionality and write to SPF file.
+  Search for (meta)patterns in a matrixmarket file. Optionally augment dimensionality and write to UZP file.
 
   ARGS:
     <patterns_file_path>
@@ -91,8 +91,8 @@ z_polyhedrator search
     --search-flags <search_flags>
       [2D SEARCH] Search Flags. Valid options: {[PatternFirst], CellFirst} where [] = default.
 
-    -w, --write-spf <output_spf_file_path>
-      Write to custom SPF file. By default writes to matrix_market_file.mtx.spf
+    -w, --write-uzp <output_uzp_file_path>
+      Write to custom UZP file. Writes to <output_uzp_file_path>.<N>d.uzp
 
     -a, --augment-dimensionality <augment_dimensionality>
       Augment dimensionality
@@ -114,11 +114,11 @@ z_polyhedrator search
 
 
 z_polyhedrator convert
-  Convert SPF file to MTX file, in either CSC or CSR format
+  Convert UZP file to MTX file, in either CSC or CSR format
 
   ARGS:
-    <input_spf_file_path>
-      Input SPF file
+    <input_uzp_file_path>
+      Input UZP file
 
     <output_mtx_file_path>
       Output mtx file
@@ -132,11 +132,11 @@ z_polyhedrator convert
 
 
 z_polyhedrator convert_timing
-  Convert SPF file to MTX file, in either CSC or CSR format. Modified into a overall slower version for timing purposes (CPU and Disk operations separated in time)
+  Convert UZP file to MTX file, in either CSC or CSR format. Modified into a overall slower version for timing purposes (CPU and Disk operations separated in time)
 
   ARGS:
-    <input_spf_file_path>
-      Input SPF file
+    <input_uzp_file_path>
+      Input UZP file
 
     <output_mtx_file_path>
       Output mtx file
@@ -166,21 +166,21 @@ However, you will notice that these commands produce no output. Some frequent us
 ./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx --print-ast-list
 ```
 
-#### Writing to SPF file
+#### Writing to UZP file
 ```bash
-./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf
+./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1
 ```
 
 #### Mixed usage
 Needless to say, flags can be combined unless explicitly said. For example, in order to obtain more information about the data transformation process, several flags can be specified at the same time.
 ```bash
-./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1.spf --print-ast-list --print-uwc-list --print-pattern-list
+./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1 --print-ast-list --print-uwc-list --print-pattern-list
 ```
 
-#### Converting SPF to MatrixMarket
+#### Converting UZP to MatrixMarket
 You may want to go the other way around. You can do so with the convert subcommand.
 ```bash
-./target/release/z_polyhedrator.exe convert ./impcol_2.2d.spf output_impcol_2.mtx
+./target/release/z_polyhedrator.exe convert ./impcol_2.2d.uzp output_impcol_2.mtx
 ```
 
 ## Main features flowchart
