@@ -6,6 +6,7 @@ use sprs::{CsMat, TriMat};
 use crate::utils::{Pattern,Piece,OriginUwc,MetaPattern,MetaPatternPiece};
 use crate::utils::orig_uwc_to_piece_1d;
 
+#[allow(dead_code)]
 pub struct SpAugment {
     pub nrows: usize,
     pub ncols: usize,
