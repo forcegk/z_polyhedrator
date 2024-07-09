@@ -1,0 +1,3 @@
+[submodule "matmul_kernels"]
+	path = matmul_kernels
+	url = git@github.com:forcegk/CSR-CSC.git
