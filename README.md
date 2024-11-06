@@ -156,31 +156,31 @@ If let's say, we wanted to execute `z_polyhedrator` for `Maragal_1` sparse matri
 cargo run -- search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
 
 # Looking for performance
-./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
+./target/release/z_polyhedrator search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx
 ```
 
 However, you will notice that these commands produce no output. Some frequent use cases can be:
 
 #### Printing AST list
 ```bash
-./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx --print-ast-list
+./target/release/z_polyhedrator search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx --print-ast-list
 ```
 
 #### Writing to UZP file
 ```bash
-./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1
+./target/release/z_polyhedrator search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1
 ```
 
 #### Mixed usage
 Needless to say, flags can be combined unless explicitly said. For example, in order to obtain more information about the data transformation process, several flags can be specified at the same time.
 ```bash
-./target/release/z_polyhedrator.exe search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1 --print-ast-list --print-uwc-list --print-pattern-list
+./target/release/z_polyhedrator search ./data/patterns.txt ./data/sparse/Maragal_1/Maragal_1.mtx -w Maragal_1 --print-ast-list --print-uwc-list --print-pattern-list
 ```
 
 #### Converting UZP to MatrixMarket
 You may want to go the other way around. You can do so with the convert subcommand.
 ```bash
-./target/release/z_polyhedrator.exe convert ./impcol_2.2d.uzp output_impcol_2.mtx
+./target/release/z_polyhedrator convert ./impcol_2.2d.uzp output_impcol_2.mtx
 ```
 
 ## Main features flowchart
