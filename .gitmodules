@@ -1,3 +1,6 @@
 [submodule "matmul_kernels"]
 	path = matmul_kernels
 	url = git@github.com:forcegk/CSR-CSC.git
+[submodule "CSR5-Testing"]
+	path = CSR5-Testing
+	url = git@github.com:forcegk/CSR5-Testing.git
