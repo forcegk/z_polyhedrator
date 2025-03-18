@@ -90,6 +90,9 @@ mod flags {
 
                 /// Output in csr format
                 optional --csr
+
+                /// Print 1D piece list (AST list). It only works in 1D shapes. Useful for utils/plot_ast_2d.py
+                optional --print-ast-list
             }
 
             /// Convert UZP file to MTX file, in either CSC or CSR format. Modified into a overall slower version for timing purposes (CPU and Disk operations separated in time)
@@ -272,10 +275,12 @@ fn main() {
                     std::io::stderr().flush().unwrap();
                     let now = Instant::now();
 
-                    uzpgen::convert_uzp(input_uzp_file_path, output_mtx_file_path, flags.csr && !flags.csc);
+                    uzpgen::convert_uzp(input_uzp_file_path, output_mtx_file_path, flags.csr && !flags.csc, flags.print_ast_list);
 
                     let elapsed = now.elapsed();
-                    println!("{} Converting UZP file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), input_uzp_file_path, elapsed.as_secs(), elapsed.subsec_millis());
+                    if !flags.print_ast_list {
+                        println!("{} Converting UZP file: {} took: {}.{:03} seconds", "[TIME]".green().bold(), input_uzp_file_path, elapsed.as_secs(), elapsed.subsec_millis());
+                    }
                     std::io::stdout().flush().unwrap();
                 }
 

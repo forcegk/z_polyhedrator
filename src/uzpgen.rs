@@ -90,13 +90,13 @@ impl UZPGen {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn print_ast_list(&self) {
-        println!("AST_List:\nRow\tCol\tN\tI\tJ");
-        self.meta_pattern_pieces.iter().for_each(|((row, col), id)| {
-            println!("{}\t{}\t{}", row, col, id);
-        });
-    }
+    // #[allow(dead_code)] // UNUSED AND REDUNDANT. TBDeleted
+    // pub fn print_ast_list(&self) {
+    //     println!("AST_List:\nRow\tCol\tN\tI\tJ");
+    //     self.meta_pattern_pieces.iter().for_each(|((row, col), id)| {
+    //         println!("{}\t{}\t{}", row, col, id);
+    //     });
+    // }
 
     pub fn print_uwc_list(&self, show_eqs: bool) {
         println!("Uwc List:\nid\tU\t\tw\tc");
@@ -373,7 +373,7 @@ impl UZPGen {
                     }
                     // DEBUG -- eprintln!();
                  },
-            _ => { panic!("The hell you did here man") }
+            _ => { panic!("{} uninc_format internal variable was {} and was set incorrectly. Fix this immediately and/or report this issue.", "[ERROR]".bold().red(), uninc_format) }
         }
 
         // Save current position for later
@@ -394,7 +394,7 @@ impl UZPGen {
     }
 }
 
-pub fn convert_uzp (input_uzp_file_path: &str, output_mtx_file_path: &str, csr: bool) {
+pub fn convert_uzp (input_uzp_file_path: &str, output_mtx_file_path: &str, csr: bool, print_ast_list: bool) {
     let mut file = File::open(input_uzp_file_path).expect(format!("Unable to open uzp file {}", input_uzp_file_path).as_str());
 
     // Read header
@@ -475,6 +475,11 @@ pub fn convert_uzp (input_uzp_file_path: &str, output_mtx_file_path: &str, csr: 
     let num_origins = file.read_i32::<LittleEndian>().unwrap();
     // let mut data_offset: i32 = 0;
 
+    if print_ast_list {
+        eprintln!("{} Printing AST List:", "[INFO]".cyan().bold());
+        println!("Row\tCol\tN\tI\tJ");
+    }
+
     for _ in 0..num_origins {
         let shape_id = file.read_i16::<LittleEndian>().unwrap();
         let base_row = file.read_i32::<LittleEndian>().unwrap();
@@ -492,6 +497,10 @@ pub fn convert_uzp (input_uzp_file_path: &str, output_mtx_file_path: &str, csr: 
         let (l_dim_of_ip, l_len_along_axis, l_c) = shapes_map.get(&shape_id).unwrap();
 
         recursive_populate_row_col_vec(*l_dim_of_ip, l_len_along_axis, l_c, &mut rowvec, &mut colvec, base_row, base_col);
+
+        if print_ast_list {
+            println!("{}\t{}\t{}\t{}\t{}", base_row, base_col, l_len_along_axis[0]+1, l_c[0], l_c[1]);
+        }
 
         // Return to previous position
         // file.seek(SeekFrom::Start(curr_pos)).unwrap();
@@ -525,7 +534,7 @@ pub fn convert_uzp (input_uzp_file_path: &str, output_mtx_file_path: &str, csr: 
                     colvec.push(file.read_i32::<LittleEndian>().unwrap() as usize);
                 }
              },
-        _ => { panic!("The hell you did here man") }
+        _ => { panic!("{} Read uninc_format variable value was {} and is unsupported at the moment. Report this issue.", "[ERROR]".bold().red(), uninc_format) }
     }
 
     // seek to data_ptr
@@ -688,7 +697,7 @@ pub fn convert_uzp_for_timing (input_uzp_file_path: &str, output_mtx_file_path: 
                     ninc_colvec.push(file.read_i32::<LittleEndian>().unwrap() as usize);
                 }
              },
-        _ => { panic!("The hell you did here man") }
+        _ => { panic!("{} Read uninc_format variable value was {} and is unsupported at the moment. Report this issue.", "[ERROR]".bold().red(), uninc_format) }
     }
 
     // seek to data_ptr
